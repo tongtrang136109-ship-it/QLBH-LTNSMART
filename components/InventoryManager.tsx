@@ -806,7 +806,8 @@ const UploadModal: React.FC<{
                     const columns = row.split(',');
                     if (columns.length < 6) return null;
                     const [name, sku, category, price, sellingPrice, stock] = columns;
-                    return {
+                    // FIX: Explicitly type the new part object to ensure type compatibility with the filter's type predicate. This resolves the error where the inferred type from the object literal (with a required 'category') was not compatible with the 'Part' type (with an optional 'category') as required by the type guard `p is Part`.
+                    const part: Part = {
                         id: `P${Date.now()}-${sku}`,
                         name: name.trim(),
                         sku: sku.trim(),
@@ -815,6 +816,7 @@ const UploadModal: React.FC<{
                         sellingPrice: parseFloat(sellingPrice),
                         stock: { [currentBranchId]: parseInt(stock) || 0 }
                     };
+                    return part;
                 }).filter((p): p is Part => p !== null);
 
                 setParts(prevParts => {
@@ -907,6 +909,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
     const [inventorySearch, setInventorySearch] = useState('');
     const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState('all');
     const [inventoryPage, setInventoryPage] = useState(1);
+    const [selectedPartIds, setSelectedPartIds] = useState<Set<string>>(new Set());
     
     const [catalogSearch, setCatalogSearch] = useState('');
     const [catalogCategoryFilter, setCatalogCategoryFilter] = useState('all');
@@ -932,9 +935,10 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
     }, []);
     
     useEffect(() => {
-        // Reset page to 1 when filters change
+        // Reset page and selection when filters change
         setInventoryPage(1);
-    }, [inventorySearch, inventoryCategoryFilter]);
+        setSelectedPartIds(new Set());
+    }, [inventorySearch, inventoryCategoryFilter, activeTab]);
     
     useEffect(() => {
         setCatalogPage(1);
@@ -1036,6 +1040,34 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
                 break;
         }
     };
+
+    const handleSelectInventoryPart = (partId: string) => {
+        setSelectedPartIds(prev => {
+            const newSelection = new Set(prev);
+            if (newSelection.has(partId)) {
+                newSelection.delete(partId);
+            } else {
+                newSelection.add(partId);
+            }
+            return newSelection;
+        });
+    };
+
+    const handleSelectAllInventory = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.checked) {
+            const allVisibleIds = paginatedInventoryParts.map(p => p.id);
+            setSelectedPartIds(new Set(allVisibleIds));
+        } else {
+            setSelectedPartIds(new Set());
+        }
+    };
+
+    const handleDeleteSelectedParts = () => {
+        if (window.confirm(`Bạn có chắc chắn muốn xóa ${selectedPartIds.size} phụ tùng đã chọn không? Hành động này sẽ xóa hoàn toàn chúng khỏi kho và không thể hoàn tác.`)) {
+            setParts(prev => prev.filter(p => !selectedPartIds.has(p.id)));
+            setSelectedPartIds(new Set());
+        }
+    };
     
     const TabButton: React.FC<{ tabId: ActiveTab; icon: React.ReactNode; label: string; }> = ({ tabId, icon, label }) => (
         <button onClick={() => setActiveTab(tabId)} className={`flex items-center gap-2 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === tabId ? 'border-sky-500 text-sky-600 dark:border-sky-400 dark:text-sky-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'}`}>
@@ -1057,6 +1089,8 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
         return filteredInventoryParts.slice(startIndex, startIndex + INVENTORY_ITEMS_PER_PAGE);
     }, [filteredInventoryParts, inventoryPage]);
     
+    const areAllInventorySelected = paginatedInventoryParts.length > 0 && paginatedInventoryParts.every(p => selectedPartIds.has(p.id));
+
     const filteredCatalogParts = useMemo(() => {
         return parts.filter(p => {
             const searchMatch = p.name.toLowerCase().includes(catalogSearch.toLowerCase()) || p.sku.toLowerCase().includes(catalogSearch.toLowerCase());
@@ -1115,11 +1149,23 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
 
             {/* Header and Actions (now conditional per tab) */}
             {activeTab === 'inventory' && (
-                <div className="flex flex-col sm:flex-row justify-end sm:items-center gap-2">
-                    <Link to="/inventory/goods-receipt/new" className="flex items-center justify-center gap-2 bg-green-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-green-700 text-sm"><PlusIcon/> Tạo phiếu nhập</Link>
-                    <button onClick={() => { setTransactionType('Xuất kho'); setIsTransactionModalOpen(true); }} className="flex items-center justify-center gap-2 bg-red-500 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-red-600 text-sm"><MinusIcon/> Xuất Kho</button>
-                    <button onClick={() => setIsTransferModalOpen(true)} className="flex items-center justify-center gap-2 bg-orange-500 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-orange-600 text-sm"><ArrowsRightLeftIcon/> Chuyển kho</button>
-                    <button onClick={() => { setSelectedPart(null); setIsPartModalOpen(true); }} className="flex items-center justify-center gap-2 bg-sky-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-sky-700 text-sm"><PlusIcon/> Thêm Mới</button>
+                <div className="flex flex-col sm:flex-row justify-end sm:items-center gap-2 flex-wrap">
+                    {selectedPartIds.size > 0 ? (
+                        <button 
+                            onClick={handleDeleteSelectedParts} 
+                            className="flex items-center justify-center gap-2 bg-red-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-red-700 text-sm"
+                        >
+                            <TrashIcon className="w-5 h-5"/>
+                            Xóa ({selectedPartIds.size}) mục đã chọn
+                        </button>
+                    ) : (
+                        <>
+                            <Link to="/inventory/goods-receipt/new" className="flex items-center justify-center gap-2 bg-green-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-green-700 text-sm"><PlusIcon/> Tạo phiếu nhập</Link>
+                            <button onClick={() => { setTransactionType('Xuất kho'); setIsTransactionModalOpen(true); }} className="flex items-center justify-center gap-2 bg-red-500 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-red-600 text-sm"><MinusIcon/> Xuất Kho</button>
+                            <button onClick={() => setIsTransferModalOpen(true)} className="flex items-center justify-center gap-2 bg-orange-500 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-orange-600 text-sm"><ArrowsRightLeftIcon/> Chuyển kho</button>
+                            <button onClick={() => { setSelectedPart(null); setIsPartModalOpen(true); }} className="flex items-center justify-center gap-2 bg-sky-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-sky-700 text-sm"><PlusIcon/> Thêm Mới</button>
+                        </>
+                    )}
                 </div>
             )}
             {activeTab === 'catalog' && (
@@ -1178,6 +1224,15 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
                         <table className="w-full text-left">
                            <thead className="border-b dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 text-sm">
                                 <tr>
+                                    <th className="p-3">
+                                        <input
+                                            type="checkbox"
+                                            className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                            onChange={handleSelectAllInventory}
+                                            checked={areAllInventorySelected}
+                                            aria-label="Select all items on this page"
+                                        />
+                                    </th>
                                     <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Tên Phụ tùng</th>
                                     <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">SKU</th>
                                     <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-center">Tồn kho (hiện tại)</th>
@@ -1192,7 +1247,16 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
                                     const currentStock = part.stock[currentBranchId] || 0;
                                     const totalStock = Object.values(part.stock).reduce((sum, count) => sum + count, 0);
                                     return (
-                                     <tr key={part.id} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                                     <tr key={part.id} className={`border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30 ${selectedPartIds.has(part.id) ? 'bg-sky-50 dark:bg-sky-900/20' : ''}`}>
+                                        <td className="p-3">
+                                            <input
+                                                type="checkbox"
+                                                className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                                checked={selectedPartIds.has(part.id)}
+                                                onChange={() => handleSelectInventoryPart(part.id)}
+                                                aria-label={`Select ${part.name}`}
+                                            />
+                                        </td>
                                         <td className="p-3 font-medium text-slate-800 dark:text-slate-200">{part.name}</td>
                                         <td className="p-3 text-slate-500 dark:text-slate-400 font-mono text-xs">{part.sku}</td>
                                         <td className={`p-3 text-center font-bold ${currentStock <= 3 ? 'text-red-500' : 'text-slate-800 dark:text-slate-200'}`}>{currentStock}</td>
