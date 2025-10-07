@@ -461,12 +461,51 @@ const WorkOrderModal: React.FC<{
                 <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
                     <div className="flex-1 overflow-y-auto p-4 sm:p-6">
                         {/* --- MOBILE ACCORDION LAYOUT --- */}
+                        {/* FIX: Correctly pass children to each AccordionSection for mobile view */}
                         <div className="space-y-4 lg:hidden">
-                           <AccordionSection title="Thông tin Khách hàng & Xe" id="customerInfo">{renderFormContent()}</AccordionSection>
-                           <AccordionSection title="Sự cố & Dịch vụ" id="issueDetails">{/* Content is inside renderFormContent */}</AccordionSection>
-                           <AccordionSection title="Chi tiết Kỹ thuật" id="serviceDetails">{/* Content is inside renderFormContent */}</AccordionSection>
-                           <AccordionSection title="Báo giá (Gia công, Đặt hàng)" id="quotationItems">{/* Separate content */}</AccordionSection>
-                           <AccordionSection title="Phụ tùng sử dụng" id="partsUsed">{/* Separate content */}</AccordionSection>
+                           <AccordionSection title="Thông tin Khách hàng & Xe" id="customerInfo">{renderFormContent().props.children[0]}</AccordionSection>
+                           <AccordionSection title="Sự cố & Dịch vụ" id="issueDetails">{renderFormContent().props.children[1]}</AccordionSection>
+                           <AccordionSection title="Chi tiết Kỹ thuật" id="serviceDetails">{renderFormContent().props.children[2]}</AccordionSection>
+                           <AccordionSection title="Báo giá (Gia công, Đặt hàng)" id="quotationItems">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-slate-100 dark:bg-slate-800"><tr><th className="p-2 font-semibold w-2/5">Mô tả</th><th className="p-2 font-semibold">SL</th><th className="p-2 font-semibold">Đ.Giá</th><th className="p-2 font-semibold">T.Tiền</th><th></th></tr></thead>
+                                    <tbody>
+                                        {formData.quotationItems?.map(item => (
+                                            <tr key={item.id} className="border-b dark:border-slate-700"><td className="p-1"><input type="text" value={item.description} onChange={e => handleUpdateQuoteItem(item.id, 'description', e.target.value)} className="w-full p-1 bg-transparent dark:text-slate-100"/></td><td className="p-1"><input type="number" value={item.quantity} onChange={e => handleUpdateQuoteItem(item.id, 'quantity', Number(e.target.value))} min="1" className="w-16 p-1 border rounded dark:bg-slate-800 dark:border-slate-600"/></td><td className="p-1"><input type="number" value={item.unitPrice} onChange={e => handleUpdateQuoteItem(item.id, 'unitPrice', Number(e.target.value))} min="0" className="w-24 p-1 border rounded dark:bg-slate-800 dark:border-slate-600"/></td><td className="p-2 dark:text-slate-100 font-semibold">{formatCurrency(item.unitPrice * item.quantity)}</td><td className="p-1 text-right"><button type="button" onClick={() => handleRemoveQuoteItem(item.id)} className="text-red-500"><TrashIcon className="w-5 h-5"/></button></td></tr>
+                                        ))}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr className="bg-slate-50 dark:bg-slate-800/50"><td className="p-1"><input type="text" placeholder="Mô tả..." value={newQuoteItem.description} onChange={e => setNewQuoteItem(prev => ({...prev, description: e.target.value}))} className="w-full p-1 border rounded bg-white dark:bg-slate-700 dark:border-slate-600"/></td><td className="p-1"><input type="number" value={newQuoteItem.quantity} onChange={e => setNewQuoteItem(prev => ({...prev, quantity: Number(e.target.value)}))} min="1" className="w-16 p-1 border rounded bg-white dark:bg-slate-700 dark:border-slate-600"/></td><td className="p-1"><input type="number" placeholder="Đơn giá" value={newQuoteItem.unitPrice || ''} onChange={e => setNewQuoteItem(prev => ({...prev, unitPrice: Number(e.target.value)}))} min="0" className="w-24 p-1 border rounded bg-white dark:bg-slate-700 dark:border-slate-600"/></td><td></td><td className="p-1 text-right"><button type="button" onClick={handleAddQuoteItem} className="bg-sky-600 text-white rounded px-3 py-1 text-sm font-semibold hover:bg-sky-700">Thêm</button></td></tr>
+                                    </tfoot>
+                                </table>
+                           </AccordionSection>
+                           <AccordionSection title="Phụ tùng sử dụng" id="partsUsed">
+                                <div className="flex justify-between items-center gap-4 mb-4">
+                                    <h4 className="font-medium text-slate-700 dark:text-slate-200">Thêm phụ tùng</h4>
+                                    <div className="flex-grow max-w-xs sm:max-w-sm">
+                                        <select onChange={(e) => { handleAddPart(parts.find(p => p.id === e.target.value) as Part); e.target.value = ""; }} defaultValue="" className="p-2 border border-slate-300 dark:border-slate-600 rounded w-full text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800">
+                                            <option value="" disabled>-- Chọn phụ tùng --</option>
+                                            {parts.filter(p => (p.stock[currentBranchId] || 0) > 0).map(p => <option key={p.id} value={p.id}>{p.name} (Tồn: {p.stock[currentBranchId]})</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="max-h-48 overflow-y-auto">
+                                    <table className="w-full text-left text-sm">
+                                        <thead className="bg-slate-100 dark:bg-slate-800 sticky top-0"><tr><th className="p-2 font-semibold">Tên</th><th className="p-2 font-semibold">SL</th><th className="p-2 font-semibold">Đ.Giá</th><th className="p-2 font-semibold">T.Tiền</th><th></th></tr></thead>
+                                        <tbody>
+                                            {formData.partsUsed?.map(p => (
+                                                <tr key={p.partId} className="border-b dark:border-slate-700">
+                                                    <td className="p-2 font-medium dark:text-slate-200">{p.partName}</td>
+                                                    <td className="p-1"><input type="number" value={p.quantity} onChange={(e) => handlePartQuantityChange(p.partId, parseInt(e.target.value))} min="1" className="w-16 p-1 border rounded dark:bg-slate-800 dark:border-slate-600"/></td>
+                                                    <td className="p-2 dark:text-slate-300">{formatCurrency(p.price)}</td>
+                                                    <td className="p-2 dark:text-slate-100 font-semibold">{formatCurrency(p.price * p.quantity)}</td>
+                                                    <td className="p-1 text-right"><button type="button" onClick={() => handleRemovePart(p.partId)} className="text-red-500"><TrashIcon className="w-5 h-5"/></button></td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                           </AccordionSection>
                         </div>
                         
                         {/* --- DESKTOP TWO-COLUMN LAYOUT --- */}
@@ -534,13 +573,23 @@ const WorkOrderModal: React.FC<{
                                         </table>
                                      </div>
                                 </div>
+                                <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-2">
+                                     <div className="flex justify-between text-sm"><span className="text-slate-700 dark:text-slate-300">Phí dịch vụ:</span> <span className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(formData.laborCost || 0)}</span></div>
+                                     <div className="flex justify-between text-sm"><span className="text-slate-700 dark:text-slate-300">Tiền phụ tùng:</span> <span className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(totalPartsCost)}</span></div>
+                                     <div className="flex justify-between text-sm"><span className="text-slate-700 dark:text-slate-300">Gia công/Đặt hàng:</span> <span className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(totalQuoteCost)}</span></div>
+                                      <div className="flex justify-between items-center py-1">
+                                         <label htmlFor="wo-discount-desktop" className="text-red-600 dark:text-red-400 font-bold text-base">Giảm giá:</label>
+                                         <input id="wo-discount-desktop" type="number" name="discount" value={formData.discount || ''} onChange={handleChange} placeholder="0" className="w-32 px-2 py-1 bg-white dark:bg-slate-700 border-2 border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 text-red-600 dark:text-red-400 font-bold text-base text-right"/>
+                                     </div>
+                                     <div className="flex justify-between text-xl font-bold pt-2 border-t border-slate-300 dark:border-slate-600"><span className="text-slate-900 dark:text-slate-100">Tổng cộng:</span> <span className="text-sky-600 dark:text-sky-400">{formatCurrency(total)}</span></div>
+                                </div>
                             </div>
                         </div>
 
                     </div>
                     {/* Sticky Footer with Totals and Actions */}
                     <div className="bg-slate-50 dark:bg-slate-800/70 backdrop-blur-sm p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 flex-shrink-0">
-                        <div className="max-w-md ml-auto space-y-2 mb-4">
+                        <div className="max-w-md ml-auto space-y-2 mb-4 lg:hidden">
                             <div className="flex justify-between text-sm"><span className="text-slate-700 dark:text-slate-300">Phí dịch vụ:</span> <span className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(formData.laborCost || 0)}</span></div>
                             <div className="flex justify-between text-sm"><span className="text-slate-700 dark:text-slate-300">Tiền phụ tùng:</span> <span className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(totalPartsCost)}</span></div>
                             <div className="flex justify-between text-sm"><span className="text-slate-700 dark:text-slate-300">Gia công/Đặt hàng:</span> <span className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(totalQuoteCost)}</span></div>
