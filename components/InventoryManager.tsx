@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import type { Part, InventoryTransaction, User, StoreSettings } from '../types';
-import { PlusIcon, PencilSquareIcon, ArchiveBoxIcon, DocumentTextIcon, MinusIcon, TrashIcon, EllipsisVerticalIcon, ExclamationTriangleIcon, Cog6ToothIcon, ArrowsRightLeftIcon, BanknotesIcon, ChevronDownIcon, CloudArrowUpIcon, ArrowUturnLeftIcon, ClockIcon, Squares2X2Icon, ArrowDownTrayIcon } from './common/Icons';
+import { PlusIcon, PencilSquareIcon, ArchiveBoxIcon, DocumentTextIcon, MinusIcon, TrashIcon, EllipsisVerticalIcon, ExclamationTriangleIcon, Cog6ToothIcon, ArrowsRightLeftIcon, BanknotesIcon, ChevronDownIcon, CloudArrowUpIcon } from './common/Icons';
 import Pagination from './common/Pagination';
 
 // Helper to format currency
@@ -147,49 +147,10 @@ const hondaPartsData: (Omit<Part, 'id' | 'stock'> & { model: string[] })[] = [
     { name: 'Vít 4x20', sku: '93891-040-2007', price: 3000, sellingPrice: 4628, category: 'Linh kiện nhỏ', model: ['Future 125', 'Wave Alpha', 'Dream'] },
 ];
 
-const LOOKUP_ITEMS_PER_PAGE = 50;
-const INVENTORY_ITEMS_PER_PAGE = 15;
-const CATALOG_ITEMS_PER_PAGE = 12;
-const HISTORY_ITEMS_PER_PAGE = 25;
-
-// Fix: Add helper function to generate deterministic colors for product categories
-// --- Category Color Helper ---
-const categoryColors = [
-    'border-t-red-500',
-    'border-t-orange-500',
-    'border-t-amber-500',
-    'border-t-yellow-500',
-    'border-t-lime-500',
-    'border-t-green-500',
-    'border-t-emerald-500',
-    'border-t-teal-500',
-    'border-t-cyan-500',
-    'border-t-sky-500',
-    'border-t-blue-500',
-    'border-t-indigo-500',
-    'border-t-violet-500',
-    'border-t-purple-500',
-    'border-t-fuchsia-500',
-    'border-t-pink-500',
-    'border-t-rose-500',
-];
-
-const getCategoryColor = (category?: string): string => {
-    if (!category) {
-        return 'border-t-slate-400';
-    }
-    // Simple hash function to get a deterministic color
-    let hash = 0;
-    for (let i = 0; i < category.length; i++) {
-        hash = category.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const index = Math.abs(hash % categoryColors.length);
-    return categoryColors[index];
-};
+const ITEMS_PER_PAGE = 50;
 
 
-// --- Modals (re-using from previous implementation, ensure they are here and correct) ---
-// PartModal, TransactionModal, HistoryModal, TransferStockModal, CategorySettingsModal
+// --- Modals ---
 const PartModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -384,9 +345,8 @@ const PartModal: React.FC<{
                         </div>
                     </div>
                     <div className="bg-slate-50 dark:bg-slate-800 px-6 py-3 flex justify-end space-x-3 border-t dark:border-slate-700">
-                        <button type="button" onClick={onClose} className="flex items-center gap-2 bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">
-                            <ArrowUturnLeftIcon className="w-5 h-5" />
-                            Trở về
+                        <button type="button" onClick={onClose} className="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">
+                            Hủy bỏ
                         </button>
                         {part?.id ? (
                             <>
@@ -421,6 +381,7 @@ const PartModal: React.FC<{
     );
 };
 
+// Fix: Add TransactionModal for handling stock import/export
 const TransactionModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -504,10 +465,7 @@ const TransactionModal: React.FC<{
                     </div>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800 px-6 py-3 flex justify-end space-x-3 border-t dark:border-slate-700">
-                    <button type="button" onClick={onClose} className="flex items-center gap-2 bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">
-                        <ArrowUturnLeftIcon className="w-5 h-5" />
-                        Trở về
-                    </button>
+                    <button type="button" onClick={onClose} className="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">Hủy</button>
                     <button type="button" onClick={handleSubmit} className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-sky-700">Lưu</button>
                 </div>
             </div>
@@ -515,6 +473,7 @@ const TransactionModal: React.FC<{
     )
 }
 
+// Fix: Add HistoryModal to view transaction history for a part
 const HistoryModal: React.FC<{
     part: Part | null;
     transactions: InventoryTransaction[];
@@ -655,10 +614,7 @@ const TransferStockModal: React.FC<{
                     </div>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800 px-6 py-3 flex justify-end space-x-3 border-t dark:border-slate-700">
-                    <button type="button" onClick={onClose} className="flex items-center gap-2 bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">
-                        <ArrowUturnLeftIcon className="w-5 h-5" />
-                        Trở về
-                    </button>
+                    <button type="button" onClick={onClose} className="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">Hủy</button>
                     <button type="button" onClick={handleSubmit} disabled={isFormInvalid} className="bg-orange-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-orange-600 disabled:bg-orange-300 disabled:cursor-not-allowed">
                         Tạo phiếu
                     </button>
@@ -722,163 +678,42 @@ const CategorySettingsModal: React.FC<{
                 <div className="p-6 overflow-y-auto space-y-3">
                     {editingCategories.map((cat, index) => (
                         <div key={index} className="flex items-center space-x-2">
-                            <input
-                                type="text"
-                                value={cat}
-                                onChange={e => handleNameChange(index, e.target.value)}
-                                className="block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500"
+                            <input 
+                                type="text" 
+                                value={cat} 
+                                onChange={(e) => handleNameChange(index, e.target.value)}
+                                className="block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100"
                             />
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (window.confirm(`Bạn có chắc muốn xóa danh mục "${categories[index]}"? Các sản phẩm thuộc danh mục này sẽ được chuyển về "Chưa phân loại".`)) {
-                                        onDelete(categories[index]);
-                                    }
-                                }}
-                                className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-md flex-shrink-0"
-                                title="Xóa danh mục"
-                            >
+                            <button onClick={() => onDelete(cat)} className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-md">
                                 <TrashIcon className="w-5 h-5"/>
                             </button>
                         </div>
                     ))}
-                    <div className="pt-4 border-t dark:border-slate-700">
-                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Thêm danh mục mới</p>
-                        <div className="flex items-center space-x-2">
-                            <input
-                                type="text"
-                                value={newCategoryName}
-                                onChange={e => setNewCategoryName(e.target.value)}
-                                placeholder="Tên danh mục mới..."
-                                className="block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md"
-                                onKeyDown={e => { if (e.key === 'Enter') handleAddNewCategory(); }}
-                            />
-                            <button type="button" onClick={handleAddNewCategory} className="px-4 py-2 bg-sky-600 text-white rounded-md text-sm font-medium hover:bg-sky-700 flex-shrink-0">Thêm</button>
-                        </div>
+                </div>
+                <div className="p-6 border-t dark:border-slate-700 space-y-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Thêm danh mục mới</label>
+                     <div className="flex items-center space-x-2">
+                        <input
+                            type="text"
+                            placeholder="Tên danh mục mới"
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            className="block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100"
+                        />
+                         <button onClick={handleAddNewCategory} className="flex items-center bg-sky-600 text-white font-semibold py-2 px-3 rounded-lg hover:bg-sky-700">
+                             <PlusIcon className="w-4 h-4 mr-1"/> Thêm
+                         </button>
                     </div>
                 </div>
-                 <div className="bg-slate-50 dark:bg-slate-800 px-6 py-3 mt-auto border-t dark:border-slate-700 flex justify-end space-x-3">
-                    <button type="button" onClick={onClose} className="flex items-center gap-2 bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">
-                        <ArrowUturnLeftIcon className="w-5 h-5" />
-                        Trở về
-                    </button>
-                    <button type="button" onClick={handleSaveChanges} className="bg-orange-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-orange-600">Lưu thay đổi</button>
+                <div className="bg-slate-50 dark:bg-slate-800 px-6 py-3 flex justify-end space-x-3 mt-auto border-t dark:border-slate-700">
+                    <button type="button" onClick={onClose} className="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">Hủy</button>
+                    <button type="button" onClick={handleSaveChanges} className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700">Cập nhật</button>
                 </div>
             </div>
         </div>
     );
 };
 
-// Fix: Add UploadModal component to handle CSV file imports.
-const UploadModal: React.FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    setParts: React.Dispatch<React.SetStateAction<Part[]>>;
-    currentBranchId: string;
-}> = ({ isOpen, onClose, setParts, currentBranchId }) => {
-    const [file, setFile] = useState<File | null>(null);
-    const [error, setError] = useState('');
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setFile(e.target.files[0]);
-            setError('');
-        }
-    };
-
-    const handleImport = () => {
-        if (!file) {
-            setError('Please select a file to upload.');
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const text = e.target?.result;
-            if (typeof text !== 'string') {
-                setError('Could not read file.');
-                return;
-            }
-
-            try {
-                const rows = text.split('\n').slice(1); // Skip header row
-                const newParts: Part[] = rows.map(row => {
-                    const columns = row.split(',');
-                    if (columns.length < 6) return null;
-                    const [name, sku, category, price, sellingPrice, stock] = columns;
-                    // FIX: Explicitly type the new part object to ensure type compatibility with the filter's type predicate. This resolves the error where the inferred type from the object literal (with a required 'category') was not compatible with the 'Part' type (with an optional 'category') as required by the type guard `p is Part`.
-                    const part: Part = {
-                        id: `P${Date.now()}-${sku}`,
-                        name: name.trim(),
-                        sku: sku.trim(),
-                        category: category.trim(),
-                        price: parseFloat(price),
-                        sellingPrice: parseFloat(sellingPrice),
-                        stock: { [currentBranchId]: parseInt(stock) || 0 }
-                    };
-                    return part;
-                }).filter((p): p is Part => p !== null);
-
-                setParts(prevParts => {
-                    const updatedParts = [...prevParts];
-                    newParts.forEach(newPart => {
-                        const existingIndex = updatedParts.findIndex(p => p.sku === newPart.sku);
-                        if (existingIndex !== -1) {
-                            // Update existing part
-                            updatedParts[existingIndex] = {
-                                ...updatedParts[existingIndex],
-                                ...newPart,
-                                id: updatedParts[existingIndex].id, // keep original id
-                                stock: {
-                                    ...updatedParts[existingIndex].stock,
-                                    ...newPart.stock
-                                }
-                            };
-                        } else {
-                            // Add new part
-                            updatedParts.push(newPart);
-                        }
-                    });
-                    return updatedParts;
-                });
-
-                onClose();
-
-            } catch (err) {
-                setError('Error parsing CSV file. Please check the format.');
-                console.error(err);
-            }
-        };
-        reader.readAsText(file);
-    };
-    
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg">
-                <div className="p-4 border-b dark:border-slate-700">
-                    <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Tải lên danh sách sản phẩm</h3>
-                </div>
-                <div className="p-6 space-y-4">
-                    <p className="text-sm text-slate-600 dark:text-slate-300">
-                        Tải lên tệp CSV với các cột: `name`, `sku`, `category`, `price`, `sellingPrice`, `stock`.
-                    </p>
-                    <input type="file" accept=".csv" onChange={handleFileChange} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100"/>
-                    {file && <p className="text-sm text-slate-500">Selected file: {file.name}</p>}
-                    {error && <p className="text-sm text-red-500">{error}</p>}
-                </div>
-                <div className="bg-slate-50 dark:bg-slate-800 px-6 py-3 flex justify-end space-x-3 border-t dark:border-slate-700">
-                    <button onClick={onClose} className="bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">Hủy</button>
-                    <button onClick={handleImport} disabled={!file} className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700 disabled:bg-sky-300">Nhập</button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-
-// --- Main Component ---
 interface InventoryManagerProps {
     currentUser: User;
     parts: Part[];
@@ -889,521 +724,855 @@ interface InventoryManagerProps {
     storeSettings: StoreSettings;
 }
 
-type ActiveTab = 'inventory' | 'catalog' | 'lookup' | 'history';
-
 const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts, setParts, transactions, setTransactions, currentBranchId, storeSettings }) => {
-    // General State
-    const [activeTab, setActiveTab] = useState<ActiveTab>('inventory');
+    const [activeTab, setActiveTab] = useState<'inventory' | 'category' | 'lookup' | 'history'>('inventory');
     const [isPartModalOpen, setIsPartModalOpen] = useState(false);
-    const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
-    const [transactionType, setTransactionType] = useState<'Nhập kho' | 'Xuất kho'>('Nhập kho');
-    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
-    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+    const [isCategorySettingsOpen, setIsCategorySettingsOpen] = useState(false);
     const [selectedPart, setSelectedPart] = useState<Part | null>(null);
-    const [activeActionMenu, setActiveActionMenu] = useState<string | null>(null);
-    const menuRef = useRef<HTMLDivElement>(null);
-    
-    // Tab-specific State
-    const [inventorySearch, setInventorySearch] = useState('');
+    const [historyModalPart, setHistoryModalPart] = useState<Part | null>(null);
+    const [historySearchTerm, setHistorySearchTerm] = useState('');
+    const [categorySearchTerm, setCategorySearchTerm] = useState('');
+    const [inventorySearchTerm, setInventorySearchTerm] = useState('');
+    const [inventoryStatusFilter, setInventoryStatusFilter] = useState('all');
     const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState('all');
-    const [inventoryPage, setInventoryPage] = useState(1);
-    const [selectedPartIds, setSelectedPartIds] = useState<Set<string>>(new Set());
+    const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
+    const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const [inventoryCurrentPage, setInventoryCurrentPage] = useState(1);
+    const [categoryCurrentPage, setCategoryCurrentPage] = useState(1);
+    const [allCategories, setAllCategories] = useState<string[]>([]);
     
-    const [catalogSearch, setCatalogSearch] = useState('');
-    const [catalogCategoryFilter, setCatalogCategoryFilter] = useState('all');
-    const [catalogPage, setCatalogPage] = useState(1);
+    // State for the new lookup tab
+    const [selectedModel, setSelectedModel] = useState('Tất cả');
+    const [lookupSearchTerm, setLookupSearchTerm] = useState('');
+    const [lookupCurrentPage, setLookupCurrentPage] = useState(1);
+    const LOOKUP_ITEMS_PER_PAGE = 20;
 
-    const [lookupModelFilter, setLookupModelFilter] = useState('all');
-    const [lookupPage, setLookupPage] = useState(1);
-    
-    const [historySearch, setHistorySearch] = useState('');
-    const [historyPage, setHistoryPage] = useState(1);
-
-    const allCategories = useMemo(() => Array.from(new Set(parts.map(p => p.category).filter((c): c is string => !!c))).sort(), [parts]);
-    const allHondaModels = useMemo(() => Array.from(new Set(hondaPartsData.flatMap(p => p.model))).sort(), []);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-                setActiveActionMenu(null);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
+    const motorcycleModels = useMemo(() => {
+        const models = new Set<string>();
+        hondaPartsData.forEach(p => p.model.forEach(m => models.add(m)));
+        return ['Tất cả', ...Array.from(models).sort()];
     }, []);
-    
-    useEffect(() => {
-        // Reset page and selection when filters change
-        setInventoryPage(1);
-        setSelectedPartIds(new Set());
-    }, [inventorySearch, inventoryCategoryFilter, activeTab]);
-    
-    useEffect(() => {
-        setCatalogPage(1);
-    }, [catalogSearch, catalogCategoryFilter]);
-    
-    useEffect(() => {
-        setLookupPage(1);
-    }, [lookupModelFilter]);
 
+    useEffect(() => {
+        setInventoryCurrentPage(1);
+    }, [inventorySearchTerm, inventoryStatusFilter, inventoryCategoryFilter]);
+
+    useEffect(() => {
+        setCategoryCurrentPage(1);
+    }, [categorySearchTerm, selectedCategoryFilter]);
+    
      useEffect(() => {
-        setHistoryPage(1);
-    }, [historySearch]);
+        setLookupCurrentPage(1);
+    }, [selectedModel, lookupSearchTerm]);
 
-    // --- Handlers ---
-    const handleSavePart = (part: Part) => {
-        setParts(prev => {
-            const exists = prev.some(p => p.id === part.id);
-            return exists ? prev.map(p => (p.id === part.id ? part : p)) : [part, ...prev];
+    useEffect(() => {
+        const derivedCategories = Array.from(new Set(parts.map(p => p.category).filter((c): c is string => !!c)));
+        setAllCategories(prevCategories => {
+            // This ensures that categories manually added but not yet used are preserved
+            const combined = new Set([...derivedCategories, ...prevCategories]);
+            return Array.from(combined).sort();
         });
+    }, [parts]);
+    
+    const inventorySummary = useMemo(() => {
+        const summary = { totalQuantity: 0, totalValue: 0 };
+        parts.forEach(part => {
+            const stockInBranch = part.stock[currentBranchId] || 0;
+            summary.totalQuantity += stockInBranch;
+            summary.totalValue += stockInBranch * part.price;
+        });
+        return summary;
+    }, [parts, currentBranchId]);
+    
+    const handleOpenPartModal = (part: Part | null = null) => {
+        setSelectedPart(part);
+        setIsPartModalOpen(true);
+        setOpenMenuId(null);
     };
 
-    const handleDeletePart = (partId: string) => {
-        if (window.confirm("Bạn có chắc muốn xóa phụ tùng này? Hành động này không thể hoàn tác.")) {
-            setParts(prev => prev.filter(p => p.id !== partId));
+    const handleClosePartModal = () => {
+        setIsPartModalOpen(false);
+        setSelectedPart(null);
+    };
+
+    const handleSavePart = (partData: Part) => {
+        const isEditing = parts.some(p => p.id === partData.id);
+        if (isEditing) {
+            setParts(prev => prev.map(p => (p.id === partData.id ? partData : p)));
+        } else {
+            setParts(prev => [partData, ...prev]);
         }
     };
     
-    const handleSelectPartFromLookup = (lookupPart: Omit<Part, 'id' | 'stock'>) => {
-        const newPartForModal: Part = {
-            id: '', // Signal to PartModal that this is a new part
-            stock: {},
-            ...lookupPart
-        };
-        setSelectedPart(newPartForModal);
-        setIsPartModalOpen(true);
+    const handleDeletePart = (partId: string) => {
+        if (window.confirm('Bạn có chắc chắn muốn xóa phụ tùng này? Hành động này không thể hoàn tác.')) {
+            setParts(prev => prev.filter(p => p.id !== partId));
+        }
+        setOpenMenuId(null);
     };
 
-    const handleSaveTransaction = (transaction: Omit<InventoryTransaction, 'id' | 'date' | 'totalPrice'>) => {
+    const handleAddCategory = (newCategory: string) => {
+       const trimmedName = newCategory.trim();
+       if (trimmedName && !allCategories.includes(trimmedName)) {
+           setAllCategories(prev => [...prev, trimmedName].sort());
+       }
+    };
+
+    const handleEditCategory = (oldName: string, newName: string) => {
+        const trimmedNewName = newName.trim();
+        if (!trimmedNewName || oldName === trimmedNewName) return;
+
+        if (allCategories.some(c => c.toLowerCase() === trimmedNewName.toLowerCase() && c.toLowerCase() !== oldName.toLowerCase())) {
+            alert(`Danh mục "${trimmedNewName}" đã tồn tại.`);
+            return;
+        }
+        
+        setParts(prev => prev.map(p => p.category === oldName ? { ...p, category: trimmedNewName } : p));
+        setAllCategories(prev => {
+            const newCategories = new Set(prev.filter(c => c !== oldName));
+            newCategories.add(trimmedNewName);
+            return Array.from(newCategories).sort();
+        });
+    };
+    
+    const handleDeleteCategory = (name: string) => {
+         if (window.confirm(`Bạn có chắc chắn muốn xóa danh mục "${name}" không? Các sản phẩm thuộc danh mục này sẽ được gán là "Chưa phân loại".`)) {
+            setParts(prev => prev.map(p => p.category === name ? { ...p, category: '' } : p));
+            setAllCategories(prev => prev.filter(c => c !== name));
+        }
+    };
+
+    const handleSaveTransaction = (transaction: Omit<InventoryTransaction, 'id'|'date'|'totalPrice'>) => {
+        const part = parts.find(p => p.id === transaction.partId);
+        if (!part) return;
+
         const newTransaction: InventoryTransaction = {
+            ...transaction,
             id: `T-${Date.now()}`,
             date: new Date().toISOString().split('T')[0],
-            totalPrice: (transaction.unitPrice || 0) * transaction.quantity,
-            ...transaction
+            unitPrice: transaction.type === 'Nhập kho' ? transaction.unitPrice : part.sellingPrice,
+            totalPrice: (transaction.type === 'Nhập kho' ? transaction.unitPrice ?? part.price : part.sellingPrice) * transaction.quantity,
         };
+
         setTransactions(prev => [newTransaction, ...prev]);
 
         setParts(prevParts => prevParts.map(p => {
-            if (p.id === newTransaction.partId) {
+            if (p.id === transaction.partId) {
                 const newStock = { ...p.stock };
-                const currentStock = newStock[newTransaction.branchId] || 0;
-                newStock[newTransaction.branchId] = newTransaction.type === 'Nhập kho'
-                    ? currentStock + newTransaction.quantity
-                    : currentStock - newTransaction.quantity;
-                
-                const updatedPart = { ...p, stock: newStock };
-                if (newTransaction.type === 'Nhập kho' && newTransaction.unitPrice) {
-                    updatedPart.price = newTransaction.unitPrice;
-                }
-                return updatedPart;
+                const currentStock = newStock[currentBranchId] || 0;
+                newStock[currentBranchId] = transaction.type === 'Nhập kho'
+                    ? currentStock + transaction.quantity
+                    : currentStock - transaction.quantity;
+                return { ...p, stock: newStock };
             }
             return p;
         }));
-        setIsTransactionModalOpen(false);
+
+        setIsExportModalOpen(false);
     };
 
     const handleSaveTransfer = (transfer: { partId: string; fromBranchId: string; toBranchId: string; quantity: number; notes: string }) => {
+        const { partId, fromBranchId, toBranchId, quantity, notes } = transfer;
+        const part = parts.find(p => p.id === partId);
+        if (!part) return;
+
         const transferId = `TR-${Date.now()}`;
-        
-        const part = parts.find(p => p.id === transfer.partId);
-        if(!part) return;
+        const fromBranchName = storeSettings.branches.find(b => b.id === fromBranchId)?.name;
+        const toBranchName = storeSettings.branches.find(b => b.id === toBranchId)?.name;
 
-        const exportTx: InventoryTransaction = { id: `T-EXP-${transferId}`, type: 'Xuất kho', partId: transfer.partId, partName: part.name, quantity: transfer.quantity, date: new Date().toISOString().split('T')[0], notes: `Chuyển đến ${storeSettings.branches.find(b => b.id === transfer.toBranchId)?.name}. ${transfer.notes}`, unitPrice: part.price, totalPrice: part.price * transfer.quantity, branchId: transfer.fromBranchId, transferId };
-        const importTx: InventoryTransaction = { id: `T-IMP-${transferId}`, type: 'Nhập kho', partId: transfer.partId, partName: part.name, quantity: transfer.quantity, date: new Date().toISOString().split('T')[0], notes: `Nhận từ ${storeSettings.branches.find(b => b.id === transfer.fromBranchId)?.name}. ${transfer.notes}`, unitPrice: part.price, totalPrice: part.price * transfer.quantity, branchId: transfer.toBranchId, transferId };
+        const exportTransaction: InventoryTransaction = {
+            id: `T-EX-${Date.now()}`, type: 'Xuất kho', partId, partName: part.name, quantity,
+            date: new Date().toISOString().split('T')[0], notes: `Chuyển đến ${toBranchName}. ${notes}`,
+            branchId: fromBranchId, transferId, unitPrice: part.price, totalPrice: part.price * quantity,
+        };
 
-        setTransactions(prev => [exportTx, importTx, ...prev]);
+        const importTransaction: InventoryTransaction = {
+            id: `T-IM-${Date.now()}`, type: 'Nhập kho', partId, partName: part.name, quantity,
+            date: new Date().toISOString().split('T')[0], notes: `Nhận từ ${fromBranchName}. ${notes}`,
+            branchId: toBranchId, transferId, unitPrice: part.price, totalPrice: part.price * quantity,
+        };
 
+        setTransactions(prev => [exportTransaction, importTransaction, ...prev]);
         setParts(prevParts => prevParts.map(p => {
-            if (p.id === transfer.partId) {
+            if (p.id === partId) {
                 const newStock = { ...p.stock };
-                newStock[transfer.fromBranchId] = (newStock[transfer.fromBranchId] || 0) - transfer.quantity;
-                newStock[transfer.toBranchId] = (newStock[transfer.toBranchId] || 0) + transfer.quantity;
+                newStock[fromBranchId] = (newStock[fromBranchId] || 0) - quantity;
+                newStock[toBranchId] = (newStock[toBranchId] || 0) + quantity;
                 return { ...p, stock: newStock };
             }
             return p;
         }));
         setIsTransferModalOpen(false);
     };
-
-    const handleCategoryAction = (action: 'add' | 'edit' | 'delete', payload: any) => {
-        switch(action) {
-            case 'add':
-                // The onAdd in PartModal will already handle this via callback
-                break;
-            case 'edit':
-                setParts(prev => prev.map(p => p.category === payload.oldName ? { ...p, category: payload.newName } : p));
-                break;
-            case 'delete':
-                setParts(prev => prev.map(p => p.category === payload.name ? { ...p, category: 'Chưa phân loại' } : p));
-                break;
-        }
-    };
-
-    const handleSelectInventoryPart = (partId: string) => {
-        setSelectedPartIds(prev => {
-            const newSelection = new Set(prev);
-            if (newSelection.has(partId)) {
-                newSelection.delete(partId);
-            } else {
-                newSelection.add(partId);
-            }
-            return newSelection;
-        });
-    };
-
-    const handleSelectAllInventory = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.checked) {
-            const allVisibleIds = paginatedInventoryParts.map(p => p.id);
-            setSelectedPartIds(new Set(allVisibleIds));
+    
+    const handleAddFromReference = (refPart: Omit<Part, 'id' | 'stock'>) => {
+        const existingPart = parts.find(p => p.sku.toLowerCase() === refPart.sku.toLowerCase());
+        if (existingPart) {
+            handleOpenPartModal(existingPart);
         } else {
-            setSelectedPartIds(new Set());
+            const newPartTemplate: Part = {
+                id: '', // Falsy value, onSave will create a new ID
+                name: refPart.name,
+                sku: refPart.sku,
+                category: refPart.category,
+                price: refPart.price, // Use price from reference
+                sellingPrice: refPart.sellingPrice, // Use selling price from reference
+                stock: {},
+            };
+            handleOpenPartModal(newPartTemplate);
         }
     };
 
-    const handleDeleteSelectedParts = () => {
-        if (window.confirm(`Bạn có chắc chắn muốn xóa ${selectedPartIds.size} phụ tùng đã chọn không? Hành động này sẽ xóa hoàn toàn chúng khỏi kho và không thể hoàn tác.`)) {
-            setParts(prev => prev.filter(p => !selectedPartIds.has(p.id)));
-            setSelectedPartIds(new Set());
-        }
-    };
+    const filteredTransactions = useMemo(() => {
+        return transactions
+            .filter(tx =>
+                tx.partName.toLowerCase().includes(historySearchTerm.toLowerCase()) ||
+                tx.id.toLowerCase().includes(historySearchTerm.toLowerCase()) ||
+                tx.notes.toLowerCase().includes(historySearchTerm.toLowerCase())
+            )
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [transactions, historySearchTerm]);
+
+    const filteredPartsForCategoryTab = useMemo(() => {
+        return parts.filter(part => {
+            const searchMatch = categorySearchTerm === '' ||
+                part.name.toLowerCase().includes(categorySearchTerm.toLowerCase()) ||
+                part.sku.toLowerCase().includes(categorySearchTerm.toLowerCase());
+            const categoryMatch = selectedCategoryFilter === 'all' || part.category === selectedCategoryFilter;
+            return searchMatch && categoryMatch;
+        });
+    }, [parts, categorySearchTerm, selectedCategoryFilter]);
+
+    const categoryTotalPages = Math.ceil(filteredPartsForCategoryTab.length / ITEMS_PER_PAGE);
+    const paginatedPartsForCategoryTab = useMemo(() => {
+        const startIndex = (categoryCurrentPage - 1) * ITEMS_PER_PAGE;
+        return filteredPartsForCategoryTab.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filteredPartsForCategoryTab, categoryCurrentPage]);
     
-    const TabButton: React.FC<{ tabId: ActiveTab; icon: React.ReactNode; label: string; }> = ({ tabId, icon, label }) => (
-        <button onClick={() => setActiveTab(tabId)} className={`flex items-center gap-2 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === tabId ? 'border-sky-500 text-sky-600 dark:border-sky-400 dark:text-sky-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'}`}>
-            {icon} {label}
-        </button>
-    );
-
-    // --- Memos for Filtered Data ---
     const filteredInventoryParts = useMemo(() => {
-        return parts.filter(p => {
-            const searchMatch = p.name.toLowerCase().includes(inventorySearch.toLowerCase()) || p.sku.toLowerCase().includes(inventorySearch.toLowerCase());
-            const categoryMatch = inventoryCategoryFilter === 'all' || p.category === inventoryCategoryFilter;
-            return searchMatch && categoryMatch;
+        const lastTransactionDateMap = new Map<string, string>();
+        transactions.forEach(tx => {
+            const existingDate = lastTransactionDateMap.get(tx.partId);
+            if (!existingDate || new Date(tx.date) > new Date(existingDate)) {
+                lastTransactionDateMap.set(tx.partId, tx.date);
+            }
         });
-    }, [parts, inventorySearch, inventoryCategoryFilter]);
 
+        return parts.filter(part => {
+            const stock = part.stock[currentBranchId] || 0;
+
+            const searchMatch = !inventorySearchTerm ||
+                part.name.toLowerCase().includes(inventorySearchTerm.toLowerCase()) ||
+                part.sku.toLowerCase().includes(inventorySearchTerm.toLowerCase());
+
+            const categoryMatch = inventoryCategoryFilter === 'all' || part.category === inventoryCategoryFilter;
+
+            let statusMatch = false;
+            switch (inventoryStatusFilter) {
+                case 'all':
+                    statusMatch = true;
+                    break;
+                case 'in-stock':
+                    statusMatch = stock > 0;
+                    break;
+                case 'out-of-stock':
+                    statusMatch = stock === 0;
+                    break;
+                case 'low-stock':
+                    statusMatch = stock > 0 && stock < 5;
+                    break;
+                case 'slow-moving':
+                    const lastTxDate = lastTransactionDateMap.get(part.id);
+                    if (stock > 0 && lastTxDate) {
+                        const daysSinceLastTx = (new Date().getTime() - new Date(lastTxDate).getTime()) / (1000 * 3600 * 24);
+                        statusMatch = daysSinceLastTx > 60;
+                    } else {
+                        statusMatch = false; 
+                    }
+                    break;
+                default:
+                    statusMatch = true;
+            }
+
+            return searchMatch && categoryMatch && statusMatch;
+        });
+    }, [parts, transactions, inventorySearchTerm, inventoryCategoryFilter, inventoryStatusFilter, currentBranchId]);
+
+    const inventoryTotalPages = Math.ceil(filteredInventoryParts.length / ITEMS_PER_PAGE);
     const paginatedInventoryParts = useMemo(() => {
-        const startIndex = (inventoryPage - 1) * INVENTORY_ITEMS_PER_PAGE;
-        return filteredInventoryParts.slice(startIndex, startIndex + INVENTORY_ITEMS_PER_PAGE);
-    }, [filteredInventoryParts, inventoryPage]);
+        const startIndex = (inventoryCurrentPage - 1) * ITEMS_PER_PAGE;
+        return filteredInventoryParts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filteredInventoryParts, inventoryCurrentPage]);
     
-    const areAllInventorySelected = paginatedInventoryParts.length > 0 && paginatedInventoryParts.every(p => selectedPartIds.has(p.id));
+    // --- Lookup Tab Logic ---
+    const filteredReferenceParts = useMemo(() => {
+        let results = hondaPartsData;
+    
+        if (selectedModel !== 'Tất cả') {
+            results = results.filter(p => p.model.includes(selectedModel));
+        }
+    
+        if (lookupSearchTerm.trim() !== '') {
+            const lowercasedTerm = lookupSearchTerm.toLowerCase();
+            results = results.filter(p =>
+                p.name.toLowerCase().includes(lowercasedTerm) ||
+                p.sku.toLowerCase().includes(lowercasedTerm)
+            );
+        }
+    
+        return results;
+    }, [selectedModel, lookupSearchTerm]);
 
-    const filteredCatalogParts = useMemo(() => {
-        return parts.filter(p => {
-            const searchMatch = p.name.toLowerCase().includes(catalogSearch.toLowerCase()) || p.sku.toLowerCase().includes(catalogSearch.toLowerCase());
-            const categoryMatch = catalogCategoryFilter === 'all' || p.category === catalogCategoryFilter;
-            return searchMatch && categoryMatch;
-        });
-    }, [parts, catalogSearch, catalogCategoryFilter]);
+    const paginatedReferenceParts = useMemo(() => {
+        const startIndex = (lookupCurrentPage - 1) * LOOKUP_ITEMS_PER_PAGE;
+        return filteredReferenceParts.slice(startIndex, startIndex + LOOKUP_ITEMS_PER_PAGE);
+    }, [filteredReferenceParts, lookupCurrentPage]);
+    
+    const totalLookupPages = Math.ceil(filteredReferenceParts.length / LOOKUP_ITEMS_PER_PAGE);
 
-    const paginatedCatalogParts = useMemo(() => {
-        const startIndex = (catalogPage - 1) * CATALOG_ITEMS_PER_PAGE;
-        return filteredCatalogParts.slice(startIndex, startIndex + CATALOG_ITEMS_PER_PAGE);
-    }, [filteredCatalogParts, catalogPage]);
     
-    const filteredLookupParts = useMemo(() => {
-        if (lookupModelFilter === 'all') return hondaPartsData;
-        return hondaPartsData.filter(p => p.model.includes(lookupModelFilter));
-    }, [lookupModelFilter]);
-    
-    const paginatedLookupParts = useMemo(() => {
-         const startIndex = (lookupPage - 1) * LOOKUP_ITEMS_PER_PAGE;
-        return filteredLookupParts.slice(startIndex, startIndex + LOOKUP_ITEMS_PER_PAGE);
-    }, [filteredLookupParts, lookupPage]);
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (openMenuId && !(event.target as HTMLElement).closest('.menu-container')) {
+                setOpenMenuId(null);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [openMenuId]);
 
-    const filteredHistory = useMemo(() => {
-        return transactions.filter(tx => 
-            tx.partName.toLowerCase().includes(historySearch.toLowerCase()) ||
-            tx.id.toLowerCase().includes(historySearch.toLowerCase()) ||
-            tx.notes.toLowerCase().includes(historySearch.toLowerCase())
-        ).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [transactions, historySearch]);
-    
-     const paginatedHistory = useMemo(() => {
-         const startIndex = (historyPage - 1) * HISTORY_ITEMS_PER_PAGE;
-        return filteredHistory.slice(startIndex, startIndex + HISTORY_ITEMS_PER_PAGE);
-    }, [filteredHistory, historyPage]);
-    
-    const inventorySummary = useMemo(() => {
-        return parts.reduce((acc, part) => {
-            const totalStock = Object.values(part.stock).reduce((sum, count) => sum + count, 0);
-            acc.totalQuantity += totalStock;
-            acc.totalValue += totalStock * part.price;
-            return acc;
-        }, { totalQuantity: 0, totalValue: 0 });
-    }, [parts]);
+    // --- CSV Upload Logic ---
+    const handleUploadClick = () => {
+        fileInputRef.current?.click();
+    };
 
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const text = e.target?.result;
+            if (typeof text === 'string') {
+                parseCSVAndImport(text);
+            }
+        };
+        reader.readAsText(file, 'UTF-8');
+        event.target.value = ''; // Reset file input to allow re-uploading the same file
+    };
+    
+    const parseCSVAndImport = (csvText: string) => {
+        try {
+            const lines = csvText.trim().split('\n');
+            const headerRow = lines[0];
+
+            if (!headerRow.toLowerCase().includes('danh mục sản phẩm') || !headerRow.toLowerCase().includes('đơn giá nhập')) {
+                 alert('Tệp không đúng định dạng. Cột tiêu đề phải chứa "Danh mục sản phẩm" và "Đơn giá nhập".');
+                 return;
+            }
+
+            const rows = lines.slice(1);
+
+            let addedCount = 0;
+            let updatedCount = 0;
+            let skippedCount = 0;
+            
+            let updatedPartsList = [...parts];
+            const newTransactions: InventoryTransaction[] = [];
+
+            rows.forEach((rowStr, index) => {
+                // Basic CSV parser to handle comma-separated values, stripping quotes
+                const row = rowStr.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                
+                if (row.length < 6) {
+                    skippedCount++;
+                    return;
+                }
+                
+                const name = row[1]?.trim();
+                const priceStr = row[2]?.trim();
+                const sellingPriceStr = row[3]?.trim();
+                const stockStr = row[5]?.trim();
+
+                if (!name || !priceStr || !sellingPriceStr || stockStr === undefined) {
+                    skippedCount++;
+                    return;
+                }
+
+                const price = parseFloat(priceStr.replace(/\./g, ''));
+                const sellingPrice = parseFloat(sellingPriceStr.replace(/\./g, ''));
+                const stock = parseInt(stockStr, 10) || 0;
+
+                if (isNaN(price) || isNaN(sellingPrice)) {
+                     skippedCount++;
+                     return;
+                }
+
+                const existingPartIndex = updatedPartsList.findIndex(p => p.name === name);
+                
+                let partIdForTransaction: string;
+
+                if (existingPartIndex > -1) { // Part exists, update it
+                    const existingPart = updatedPartsList[existingPartIndex];
+                    const updatedPart = {
+                        ...existingPart,
+                        price,
+                        sellingPrice,
+                        stock: {
+                            ...existingPart.stock,
+                            [currentBranchId]: (existingPart.stock[currentBranchId] || 0) + stock,
+                        }
+                    };
+                    updatedPartsList[existingPartIndex] = updatedPart;
+                    partIdForTransaction = existingPart.id;
+                    updatedCount++;
+                } else { // New part
+                    const newPartId = `P${Date.now()}-${index}`;
+                    partIdForTransaction = newPartId;
+                    const firstWord = name.split(' ')[0] || `SKU${index}`;
+                    const sku = updatedPartsList.some(p => p.sku === firstWord) ? `${firstWord}-${Date.now()}` : firstWord;
+
+                    const newPart: Part = {
+                        id: newPartId, name, sku, price, sellingPrice,
+                        stock: { [currentBranchId]: stock },
+                        category: 'Chưa phân loại'
+                    };
+                    updatedPartsList.push(newPart);
+                    addedCount++;
+                }
+
+                if (stock > 0) {
+                     newTransactions.push({
+                        id: `T-IMP-${Date.now()}-${index}`, type: 'Nhập kho', partId: partIdForTransaction,
+                        partName: name, quantity: stock, date: new Date().toISOString().split('T')[0],
+                        notes: 'Nhập kho từ tệp CSV', unitPrice: price, totalPrice: price * stock,
+                        branchId: currentBranchId,
+                    });
+                }
+            });
+
+            // Batch update state
+            setParts(updatedPartsList);
+            
+            if (newTransactions.length > 0) {
+                 setTransactions(prev => [...newTransactions, ...prev]);
+            }
+            
+            let message = `Nhập tệp thành công! ${addedCount} sản phẩm mới, ${updatedCount} sản phẩm được cập nhật.`;
+            if (skippedCount > 0) {
+                message += ` Đã bỏ qua ${skippedCount} dòng do lỗi dữ liệu.`
+            }
+            alert(message);
+        } catch (error) {
+            console.error("Lỗi khi xử lý tệp CSV:", error);
+            alert("Đã xảy ra lỗi khi xử lý tệp. Vui lòng kiểm tra định dạng và thử lại.");
+        }
+    };
 
     return (
-        <div className="space-y-6">
-             {/* Modals */}
-             <PartModal isOpen={isPartModalOpen} onClose={() => setIsPartModalOpen(false)} onSave={handleSavePart} part={selectedPart} parts={parts} allCategories={allCategories} onAddCategory={(name) => handleCategoryAction('add', { name })} currentBranchId={currentBranchId} />
-             <TransactionModal isOpen={isTransactionModalOpen} onClose={() => setIsTransactionModalOpen(false)} onSave={handleSaveTransaction} parts={parts} type={transactionType} currentBranchId={currentBranchId} />
-             <HistoryModal part={selectedPart} transactions={transactions} onClose={() => { setIsHistoryModalOpen(false); setSelectedPart(null); }} storeSettings={storeSettings} />
-             <TransferStockModal isOpen={isTransferModalOpen} onClose={() => setIsTransferModalOpen(false)} onSave={handleSaveTransfer} parts={parts} branches={storeSettings.branches} currentBranchId={currentBranchId} />
-             <CategorySettingsModal isOpen={isCategoryModalOpen} onClose={() => setIsCategoryModalOpen(false)} categories={allCategories} onAdd={(name) => handleCategoryAction('add', { name })} onEdit={(oldName, newName) => handleCategoryAction('edit', { oldName, newName })} onDelete={(name) => handleCategoryAction('delete', { name })} />
-             <UploadModal isOpen={isUploadModalOpen} onClose={() => setIsUploadModalOpen(false)} setParts={setParts} currentBranchId={currentBranchId} />
-
-            {/* Header and Actions (now conditional per tab) */}
-            {activeTab === 'inventory' && (
-                <div className="flex flex-col sm:flex-row justify-end sm:items-center gap-2 flex-wrap">
-                    {selectedPartIds.size > 0 ? (
-                        <button 
-                            onClick={handleDeleteSelectedParts} 
-                            className="flex items-center justify-center gap-2 bg-red-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-red-700 text-sm"
-                        >
-                            <TrashIcon className="w-5 h-5"/>
-                            Xóa ({selectedPartIds.size}) mục đã chọn
-                        </button>
-                    ) : (
-                        <>
-                            <Link to="/inventory/goods-receipt/new" className="flex items-center justify-center gap-2 bg-green-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-green-700 text-sm"><PlusIcon/> Tạo phiếu nhập</Link>
-                            <button onClick={() => { setTransactionType('Xuất kho'); setIsTransactionModalOpen(true); }} className="flex items-center justify-center gap-2 bg-red-500 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-red-600 text-sm"><MinusIcon/> Xuất Kho</button>
-                            <button onClick={() => setIsTransferModalOpen(true)} className="flex items-center justify-center gap-2 bg-orange-500 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-orange-600 text-sm"><ArrowsRightLeftIcon/> Chuyển kho</button>
-                            <button onClick={() => { setSelectedPart(null); setIsPartModalOpen(true); }} className="flex items-center justify-center gap-2 bg-sky-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-sky-700 text-sm"><PlusIcon/> Thêm Mới</button>
-                        </>
-                    )}
-                </div>
-            )}
-            {activeTab === 'catalog' && (
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                     <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Danh mục sản phẩm</h1>
-                     <div className="flex items-center gap-2">
-                        <button onClick={() => setIsCategoryModalOpen(true)} className="p-2.5 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600" title="Cài đặt danh mục"><Cog6ToothIcon className="w-5 h-5 text-slate-700 dark:text-slate-200"/></button>
-                        <button onClick={() => setIsUploadModalOpen(true)} className="flex items-center gap-2 bg-green-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-green-700 text-sm"><CloudArrowUpIcon/> Tải lên</button>
-                        <button onClick={() => { setSelectedPart(null); setIsPartModalOpen(true); }} className="flex items-center gap-2 bg-sky-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-sky-700 text-sm"><PlusIcon/> Thêm Phụ tùng</button>
-                     </div>
-                </div>
-            )}
-             
-             {/* Tab Navigation */}
-            <div className="border-b border-slate-200 dark:border-slate-700">
+        <div>
+            <PartModal isOpen={isPartModalOpen} onClose={handleClosePartModal} onSave={handleSavePart} part={selectedPart} parts={parts} allCategories={allCategories} onAddCategory={handleAddCategory} currentBranchId={currentBranchId} />
+            <TransactionModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} onSave={handleSaveTransaction} parts={parts} type="Xuất kho" currentBranchId={currentBranchId} />
+            <HistoryModal part={historyModalPart} onClose={() => setHistoryModalPart(null)} transactions={transactions} storeSettings={storeSettings} />
+            <TransferStockModal isOpen={isTransferModalOpen} onClose={() => setIsTransferModalOpen(false)} onSave={handleSaveTransfer} parts={parts} branches={storeSettings.branches} currentBranchId={currentBranchId} />
+            <CategorySettingsModal isOpen={isCategorySettingsOpen} onClose={() => setIsCategorySettingsOpen(false)} categories={allCategories} onAdd={handleAddCategory} onEdit={handleEditCategory} onDelete={handleDeleteCategory} />
+            
+            <div className="border-b border-slate-200 dark:border-slate-700 mb-6">
                 <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-                    <TabButton tabId="inventory" icon={<ArchiveBoxIcon className="w-5 h-5" />} label="Tồn kho" />
-                    <TabButton tabId="catalog" icon={<Squares2X2Icon className="w-5 h-5" />} label="Danh mục sản phẩm" />
-                    <TabButton tabId="lookup" icon={<DocumentTextIcon className="w-5 h-5" />} label="Tra cứu Phụ tùng" />
-                    <TabButton tabId="history" icon={<ClockIcon className="w-5 h-5" />} label="Lịch sử" />
+                    <button onClick={() => setActiveTab('inventory')} className={`flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'inventory' ? 'border-sky-500 text-sky-600 dark:text-sky-400 dark:border-sky-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'}`}>
+                        <ArchiveBoxIcon className="w-5 h-5 mr-2" /> Tồn kho
+                    </button>
+                     <button onClick={() => setActiveTab('category')} className={`flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'category' ? 'border-sky-500 text-sky-600 dark:text-sky-400 dark:border-sky-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'}`}>
+                        <ArchiveBoxIcon className="w-5 h-5 mr-2" /> Danh mục sản phẩm
+                    </button>
+                     <button onClick={() => setActiveTab('lookup')} className={`flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'lookup' ? 'border-sky-500 text-sky-600 dark:text-sky-400 dark:border-sky-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'}`}>
+                        <DocumentTextIcon className="w-5 h-5 mr-2" /> Tra cứu Phụ tùng
+                    </button>
+                    <button onClick={() => setActiveTab('history')} className={`flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'history' ? 'border-sky-500 text-sky-600 dark:text-sky-400 dark:border-sky-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'}`}>
+                        <DocumentTextIcon className="w-5 h-5 mr-2" /> Lịch sử
+                    </button>
                 </nav>
             </div>
             
-            {/* --- TAB CONTENT --- */}
-
-            {/* 1. TỒN KHO */}
             {activeTab === 'inventory' && (
-                <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <input type="text" placeholder="Tìm kiếm theo tên hoặc SKU..." value={inventorySearch} onChange={e => setInventorySearch(e.target.value)} className="md:col-span-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 dark:text-slate-100" />
-                        <select value={currentBranchId} disabled className="md:col-span-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-slate-100 dark:bg-slate-800 dark:text-slate-400 cursor-not-allowed">
-                             {storeSettings.branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                        </select>
-                         <select value={inventoryCategoryFilter} onChange={e => setInventoryCategoryFilter(e.target.value)} className="md:col-span-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 dark:text-slate-100">
-                             <option value="all">Tất cả danh mục</option>
-                             {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                    </div>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg flex items-center gap-4 border border-blue-200 dark:border-blue-800">
-                            <div className="bg-blue-500 p-3 rounded-full text-white"><ArchiveBoxIcon className="w-6 h-6"/></div>
-                            <div>
-                                <p className="text-sm text-blue-800 dark:text-blue-300">Tổng SL tồn</p>
-                                <p className="text-2xl font-bold text-blue-900 dark:text-blue-200">{inventorySummary.totalQuantity}</p>
-                            </div>
+                <div>
+                     <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-6 gap-4">
+                        {/* Filters on the left */}
+                        <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto lg:flex-grow">
+                             <input
+                                type="text"
+                                placeholder="Tìm kiếm theo tên hoặc SKU..."
+                                value={inventorySearchTerm}
+                                onChange={e => setInventorySearchTerm(e.target.value)}
+                                className="w-full sm:flex-1 p-3 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800"
+                            />
+                            <select
+                                value={inventoryStatusFilter}
+                                onChange={e => setInventoryStatusFilter(e.target.value)}
+                                className="w-full sm:w-auto p-3 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800"
+                            >
+                                <option value="all">Tất cả trạng thái</option>
+                                <option value="in-stock">Còn hàng</option>
+                                <option value="out-of-stock">Hết hàng</option>
+                                <option value="low-stock">Dưới định mức tồn</option>
+                                <option value="slow-moving">Tồn kho quá 60 ngày</option>
+                            </select>
+                            <select
+                                value={inventoryCategoryFilter}
+                                onChange={e => setInventoryCategoryFilter(e.target.value)}
+                                className="w-full sm:w-auto p-3 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800"
+                            >
+                                <option value="all">Tất cả danh mục</option>
+                                {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                            </select>
                         </div>
-                         <div className="bg-green-50 dark:bg-green-900/30 p-4 rounded-lg flex items-center gap-4 border border-green-200 dark:border-green-800">
-                            <div className="bg-green-500 p-3 rounded-full text-white"><BanknotesIcon className="w-6 h-6"/></div>
-                            <div>
-                                <p className="text-sm text-green-800 dark:text-green-300">Giá trị tồn kho</p>
-                                <p className="text-2xl font-bold text-green-900 dark:text-green-200">{formatCurrency(inventorySummary.totalValue)}</p>
-                            </div>
+
+                        {/* Buttons on the right */}
+                        <div className="flex flex-wrap gap-2 justify-end w-full lg:w-auto lg:flex-shrink-0">
+                            <Link to="/inventory/goods-receipt/new" className="flex items-center bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-green-700">
+                                <PlusIcon /> <span className="ml-2 hidden sm:inline">Tạo phiếu nhập</span>
+                            </Link>
+                            <button onClick={() => setIsExportModalOpen(true)} className="flex items-center bg-red-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-red-600">
+                                <MinusIcon /> <span className="ml-2 hidden sm:inline">Xuất Kho</span>
+                            </button>
+                             <button onClick={() => setIsTransferModalOpen(true)} className="flex items-center bg-orange-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-orange-600">
+                                <ArrowsRightLeftIcon className="w-5 h-5" /> <span className="ml-2 hidden sm:inline">Chuyển kho</span>
+                            </button>
+                            <button onClick={() => handleOpenPartModal()} className="flex items-center bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-sky-700">
+                                <PlusIcon /> <span className="ml-2 hidden sm:inline">Thêm Mới</span>
+                            </button>
                         </div>
                     </div>
-                    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 overflow-x-auto">
-                        <table className="w-full text-left">
-                           <thead className="border-b dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 text-sm">
-                                <tr>
-                                    <th className="p-3">
-                                        <input
-                                            type="checkbox"
-                                            className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                                            onChange={handleSelectAllInventory}
-                                            checked={areAllInventorySelected}
-                                            aria-label="Select all items on this page"
-                                        />
-                                    </th>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Tên Phụ tùng</th>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">SKU</th>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-center">Tồn kho (hiện tại)</th>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-center">Tổng tồn kho</th>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Giá nhập</th>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Giá bán</th>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Hành động</th>
-                                </tr>
-                            </thead>
-                             <tbody>
-                                {paginatedInventoryParts.map(part => {
-                                    const currentStock = part.stock[currentBranchId] || 0;
-                                    const totalStock = Object.values(part.stock).reduce((sum, count) => sum + count, 0);
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div className="bg-white dark:bg-slate-800 p-5 rounded-lg shadow-md flex items-center border dark:border-slate-700">
+                            <div className="p-3 rounded-full bg-sky-500 text-white"><ArchiveBoxIcon className="w-6 h-6" /></div>
+                            <div className="ml-4"><p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Tổng SL tồn</p><p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{inventorySummary.totalQuantity.toLocaleString('vi-VN')}</p></div>
+                        </div>
+                        <div className="bg-white dark:bg-slate-800 p-5 rounded-lg shadow-md flex items-center border dark:border-slate-700">
+                            <div className="p-3 rounded-full bg-green-500 text-white"><BanknotesIcon className="w-6 h-6" /></div>
+                            <div className="ml-4"><p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Giá trị tồn</p><p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{formatCurrency(inventorySummary.totalValue)}</p></div>
+                        </div>
+                    </div>
+                    
+                    {filteredInventoryParts.length > 0 ? (
+                        <>
+                            <div className="lg:hidden space-y-4">
+                                {paginatedInventoryParts.map(p => {
+                                    const stockInBranch = p.stock?.[currentBranchId] ?? 0;
+                                    const totalStock = Object.values(p.stock || {}).reduce((a: number, b: number) => a + b, 0);
                                     return (
-                                     <tr key={part.id} className={`border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30 ${selectedPartIds.has(part.id) ? 'bg-sky-50 dark:bg-sky-900/20' : ''}`}>
-                                        <td className="p-3">
-                                            <input
-                                                type="checkbox"
-                                                className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                                                checked={selectedPartIds.has(part.id)}
-                                                onChange={() => handleSelectInventoryPart(part.id)}
-                                                aria-label={`Select ${part.name}`}
-                                            />
-                                        </td>
-                                        <td className="p-3 font-medium text-slate-800 dark:text-slate-200">{part.name}</td>
-                                        <td className="p-3 text-slate-500 dark:text-slate-400 font-mono text-xs">{part.sku}</td>
-                                        <td className={`p-3 text-center font-bold ${currentStock <= 3 ? 'text-red-500' : 'text-slate-800 dark:text-slate-200'}`}>{currentStock}</td>
-                                        <td className="p-3 text-center text-slate-600 dark:text-slate-300">{totalStock}</td>
-                                        <td className="p-3 text-right text-slate-600 dark:text-slate-300">{formatCurrency(part.price)}</td>
-                                        <td className="p-3 text-right font-semibold text-sky-600 dark:text-sky-400">{formatCurrency(part.sellingPrice)}</td>
-                                        <td className="p-3">
-                                            <div className="flex items-center gap-3">
-                                                <button onClick={() => { setSelectedPart(part); setIsPartModalOpen(true); }} title="Chỉnh sửa"><PencilSquareIcon className="w-5 h-5 text-sky-600 dark:text-sky-400 hover:opacity-70"/></button>
-                                                <button onClick={() => { setSelectedPart(part); setIsHistoryModalOpen(true); }} title="Lịch sử"><ClockIcon className="w-5 h-5 text-slate-500 hover:opacity-70"/></button>
-                                                <button onClick={() => handleDeletePart(part.id)} title="Xóa"><TrashIcon className="w-5 h-5 text-red-500 hover:opacity-70"/></button>
+                                        <div key={p.id} className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-md border border-slate-200 dark:border-slate-700">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                    <p className="font-bold text-slate-800 dark:text-slate-100 flex items-center">{p.name} {stockInBranch > 0 && stockInBranch < 5 && <ExclamationTriangleIcon className="w-5 h-5 text-red-500 ml-2" />}</p>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{p.sku}</p>
                                             </div>
-                                        </td>
-                                    </tr>
-                                )})}
-                            </tbody>
-                        </table>
-                         {paginatedInventoryParts.length === 0 && <p className="text-center p-8 text-slate-500 dark:text-slate-400">Không tìm thấy phụ tùng nào.</p>}
-                    </div>
-                     {filteredInventoryParts.length > INVENTORY_ITEMS_PER_PAGE && <Pagination currentPage={inventoryPage} totalPages={Math.ceil(filteredInventoryParts.length / INVENTORY_ITEMS_PER_PAGE)} onPageChange={setInventoryPage} itemsPerPage={INVENTORY_ITEMS_PER_PAGE} totalItems={filteredInventoryParts.length} />}
-                </div>
-            )}
-            
-            {/* 2. DANH MỤC SẢN PHẨM (GRID VIEW) */}
-             {activeTab === 'catalog' && (
-                <div className="space-y-4">
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input type="text" placeholder="Tìm kiếm theo tên, SKU..." value={catalogSearch} onChange={e => setCatalogSearch(e.target.value)} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 dark:text-slate-100" />
-                        <select value={catalogCategoryFilter} onChange={e => setCatalogCategoryFilter(e.target.value)} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 dark:text-slate-100">
-                             <option value="all">Tất cả danh mục</option>
-                             {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                         {paginatedCatalogParts.map(part => {
-                             const cardColor = getCategoryColor(part.category);
-                             const totalStock = Object.values(part.stock).reduce((a, b) => a + b, 0);
-                             return (
-                                <div key={part.id} className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 relative border-t-4 overflow-hidden ${cardColor}`}>
-                                    <div className="p-4 space-y-2">
-                                        <div className="absolute top-2 right-2">
-                                            <EllipsisVerticalIcon className="w-5 h-5 text-slate-400"/>
+                                            <div className="flex items-center space-x-2">
+                                                <button onClick={() => handleOpenPartModal(p)} className="text-sky-600 dark:text-sky-400 p-1"><PencilSquareIcon className="w-5 h-5"/></button>
+                                                <button onClick={() => handleDeletePart(p.id)} className="text-red-600 p-1"><TrashIcon className="w-5 h-5"/></button>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
-                                                <ArchiveBoxIcon className="w-6 h-6 text-slate-500 dark:text-slate-400"/>
+                                        <div className="mt-4 flex justify-between items-center text-sm">
+                                            <div className="text-center">
+                                                <p className="text-slate-500 dark:text-slate-400">Tồn kho</p>
+                                                <p className={`font-bold text-lg ${stockInBranch < 5 ? 'text-red-600' : 'text-sky-600 dark:text-sky-400'}`}>{stockInBranch}</p>
+                                                <p className="text-xs text-slate-400 dark:text-slate-500">Tổng: {totalStock}</p>
                                             </div>
                                             <div>
-                                                <p className="font-semibold text-slate-800 dark:text-slate-200 leading-tight">{part.name}</p>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">{part.sku}</p>
+                                                <p className="text-slate-500 dark:text-slate-400 text-right">Giá nhập</p>
+                                                <p className="font-semibold text-slate-800 dark:text-slate-100 text-right">{formatCurrency(p.price)}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-slate-500 dark:text-slate-400 text-right">Giá bán</p>
+                                                <p className="font-bold text-slate-900 dark:text-slate-50 text-right">{formatCurrency(p.sellingPrice)}</p>
+                                            </div>
                                             </div>
                                         </div>
-                                        <button className="text-xs font-semibold text-sky-700 bg-sky-100 dark:text-sky-300 dark:bg-sky-900/50 px-2 py-0.5 rounded-full">{part.category || 'Chưa phân loại'}</button>
-                                        <div className="grid grid-cols-2 gap-x-4 border-t pt-2 dark:border-slate-700">
-                                            <div className="text-sm"><p className="text-slate-500 dark:text-slate-400">Giá nhập:</p><p className="font-medium text-slate-700 dark:text-slate-300">{formatCurrency(part.price)}</p></div>
-                                            <div className="text-sm text-right"><p className="text-slate-500 dark:text-slate-400">Giá bán:</p><p className="font-bold text-sky-600 dark:text-sky-400">{formatCurrency(part.sellingPrice)}</p></div>
+                                    )
+                                })}
+                            </div>
+
+                            <div className="hidden lg:block bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md overflow-x-auto">
+                                <table className="w-full text-left min-w-max">
+                                    <thead><tr className="bg-slate-50 dark:bg-slate-700/50 border-b dark:border-slate-700"><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Tên Phụ tùng</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">SKU</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Tồn kho (hiện tại)</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Tổng tồn kho</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Giá nhập</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Giá bán</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Hành động</th></tr></thead>
+                                    <tbody>
+                                        {paginatedInventoryParts.map(p => {
+                                            const stockInBranch = p.stock?.[currentBranchId] ?? 0;
+                                            const totalStock = Object.values(p.stock || {}).reduce((a: number, b: number) => a + b, 0);
+                                            return (
+                                            <tr key={p.id} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                                <td className="p-3 font-semibold text-slate-900 dark:text-slate-100"><div className="flex items-center space-x-2"><span>{p.name}</span>{stockInBranch > 0 && stockInBranch < 5 && (<ExclamationTriangleIcon className="w-5 h-5 text-red-500" title={`Tồn kho thấp: ${stockInBranch}`} />)}</div></td>
+                                                <td className="p-3 text-slate-600 dark:text-slate-300">{p.sku}</td>
+                                                <td className={`p-3 font-medium ${stockInBranch < 5 ? 'text-red-600 font-bold' : 'text-slate-900 dark:text-slate-100'}`}>{stockInBranch}</td>
+                                                <td className="p-3 text-slate-700 dark:text-slate-300 font-medium">{totalStock}</td>
+                                                <td className="p-3 text-slate-800 dark:text-slate-200">{formatCurrency(p.price)}</td>
+                                                <td className="p-3 text-slate-800 dark:text-slate-200 font-semibold">{formatCurrency(p.sellingPrice)}</td>
+                                                <td className="p-3">
+                                                    <div className="flex items-center space-x-4">
+                                                        <button onClick={() => handleOpenPartModal(p)} className="text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300" title="Chỉnh sửa"><PencilSquareIcon className="w-5 h-5"/></button>
+                                                        <button onClick={() => setHistoryModalPart(p)} className="text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200" title="Xem lịch sử"><DocumentTextIcon className="w-5 h-5"/></button>
+                                                        <button onClick={() => handleDeletePart(p.id)} className="text-red-600 hover:text-red-800 dark:text-red-500 dark:hover:text-red-400" title="Xóa"><TrashIcon className="w-5 h-5"/></button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )})}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="bg-white dark:bg-slate-800 p-8 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 text-center text-slate-500 dark:text-slate-400">
+                            <p className="font-semibold">Không tìm thấy phụ tùng nào</p>
+                            <p className="text-sm">Thử thay đổi từ khóa tìm kiếm của bạn.</p>
+                        </div>
+                    )}
+
+                    {inventoryTotalPages > 1 && (
+                       <div className="mt-6">
+                           <Pagination
+                               currentPage={inventoryCurrentPage}
+                               totalPages={inventoryTotalPages}
+                               onPageChange={setInventoryCurrentPage}
+                               itemsPerPage={ITEMS_PER_PAGE}
+                               totalItems={filteredInventoryParts.length}
+                           />
+                       </div>
+                   )}
+                </div>
+            )}
+
+            {activeTab === 'category' && (
+                <div>
+                    <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-6 gap-4">
+                        {/* Filters on the left */}
+                        <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto lg:flex-grow">
+                            <input
+                                type="text"
+                                placeholder="Tìm theo tên, SKU..."
+                                value={categorySearchTerm}
+                                onChange={e => setCategorySearchTerm(e.target.value)}
+                                className="w-full sm:flex-1 p-3 border dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800"
+                            />
+                            <select
+                                value={selectedCategoryFilter}
+                                onChange={e => setSelectedCategoryFilter(e.target.value)}
+                                className="w-full sm:w-auto p-3 border dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800"
+                            >
+                                <option value="all">Tất cả danh mục</option>
+                                {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                            </select>
+                        </div>
+            
+                        {/* Buttons on the right */}
+                        <div className="flex flex-wrap gap-2 justify-end w-full lg:w-auto lg:flex-shrink-0">
+                            <button onClick={() => setIsCategorySettingsOpen(true)} className="p-2 bg-slate-200 dark:bg-slate-700 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">
+                                <Cog6ToothIcon className="w-6 h-6 text-slate-700 dark:text-slate-200" />
+                            </button>
+                            <button
+                                onClick={handleUploadClick}
+                                className="flex items-center bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-green-700"
+                                title="Tải lên tệp CSV (Tên,Mã SP,Danh mục,Giá nhập,Giá bán,Tồn kho)"
+                            >
+                                <CloudArrowUpIcon className="w-5 h-5" /> <span className="ml-2 hidden sm:inline">Tải lên</span>
+                            </button>
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleFileChange}
+                                className="hidden"
+                                accept=".csv"
+                            />
+                            <button onClick={() => handleOpenPartModal()} className="flex items-center bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-sky-700">
+                                <PlusIcon /> <span className="ml-2 hidden sm:inline">Thêm Phụ tùng</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        {paginatedPartsForCategoryTab.map(part => {
+                            const stockInBranch = part.stock[currentBranchId] || 0;
+                            return (
+                                <div key={part.id} className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-md border dark:border-slate-700 flex flex-col">
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex items-start space-x-4">
+                                            <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-md flex items-center justify-center flex-shrink-0">
+                                                <ArchiveBoxIcon className="w-8 h-8 text-slate-400 dark:text-slate-500" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-slate-800 dark:text-slate-100">{part.name}</p>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400">{part.sku}</p>
+                                                <p className="text-xs text-sky-600 dark:text-sky-400 font-medium mt-1">{part.category || 'Chưa phân loại'}</p>
+                                            </div>
                                         </div>
-                                        {totalStock <= 5 && (
-                                            <p className="text-xs font-bold text-red-500 dark:text-red-400 flex items-center gap-1"><ExclamationTriangleIcon className="w-4 h-4"/> Tồn kho thấp: {totalStock}</p>
+                                         <div className="relative menu-container">
+                                            <button onClick={() => setOpenMenuId(openMenuId === part.id ? null : part.id)} className="p-1 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100"><EllipsisVerticalIcon className="w-5 h-5" /></button>
+                                             {openMenuId === part.id && (
+                                                <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-slate-700 rounded-md shadow-lg z-10 border dark:border-slate-600">
+                                                    <a href="#" onClick={(e) => { e.preventDefault(); handleOpenPartModal(part); }} className="block px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-600">Chỉnh sửa</a>
+                                                    <a href="#" onClick={(e) => { e.preventDefault(); handleDeletePart(part.id); }} className="block px-4 py-2 text-sm text-red-600 hover:bg-slate-100 dark:hover:bg-slate-600">Xóa</a>
+                                                </div>
+                                             )}
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 pt-4 border-t dark:border-slate-700 space-y-2 flex-grow">
+                                        <div className="flex justify-between text-sm"><span className="text-slate-500 dark:text-slate-400">Giá nhập:</span> <span className="font-medium text-slate-800 dark:text-slate-200">{formatCurrency(part.price)}</span></div>
+                                        <div className="flex justify-between text-sm"><span className="text-slate-500 dark:text-slate-400">Giá bán:</span> <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(part.sellingPrice)}</span></div>
+                                    </div>
+                                    <div className="mt-2 text-right">
+                                        {stockInBranch > 0 && stockInBranch < 5 && (
+                                            <div className="inline-flex items-center text-xs text-red-600 dark:text-red-400 font-semibold bg-red-100 dark:bg-red-900/50 px-2 py-1 rounded-full">
+                                                <ExclamationTriangleIcon className="w-4 h-4 mr-1" />
+                                                Tồn kho thấp: {stockInBranch}
+                                            </div>
                                         )}
                                     </div>
                                 </div>
-                            )
+                            );
                         })}
                     </div>
-                     {paginatedCatalogParts.length === 0 && <p className="text-center p-8 text-slate-500 dark:text-slate-400">Không tìm thấy phụ tùng nào.</p>}
-                     {filteredCatalogParts.length > CATALOG_ITEMS_PER_PAGE && <Pagination currentPage={catalogPage} totalPages={Math.ceil(filteredCatalogParts.length / CATALOG_ITEMS_PER_PAGE)} onPageChange={setCatalogPage} itemsPerPage={CATALOG_ITEMS_PER_PAGE} totalItems={filteredCatalogParts.length}/>}
+                     {filteredPartsForCategoryTab.length === 0 && <div className="text-center py-12 text-slate-500 dark:text-slate-400">Không tìm thấy sản phẩm nào.</div>}
+                    
+                     {categoryTotalPages > 1 && (
+                       <div className="mt-6">
+                           <Pagination
+                               currentPage={categoryCurrentPage}
+                               totalPages={categoryTotalPages}
+                               onPageChange={setCategoryCurrentPage}
+                               itemsPerPage={ITEMS_PER_PAGE}
+                               totalItems={filteredPartsForCategoryTab.length}
+                           />
+                       </div>
+                   )}
                 </div>
             )}
-
-            {/* 3. TRA CỨU PHỤ TÙNG */}
+            
             {activeTab === 'lookup' && (
-                 <div className="space-y-4">
-                    <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Tra cứu phụ tùng Honda Việt Nam</h1>
-                    <div>
-                         <label htmlFor="model-filter" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Chọn dòng xe:</label>
-                         <select id="model-filter" value={lookupModelFilter} onChange={e => setLookupModelFilter(e.target.value)} className="mt-1 w-full md:w-1/2 p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 dark:text-slate-100">
-                            <option value="all">Tất cả</option>
-                            {allHondaModels.map(model => <option key={model} value={model}>{model}</option>)}
-                         </select>
+                <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200/60 dark:border-slate-700">
+                     <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                        <div className="flex-1">
+                             <label htmlFor="model-select" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Chọn dòng xe:</label>
+                             <select 
+                                id="model-select"
+                                value={selectedModel}
+                                onChange={e => setSelectedModel(e.target.value)}
+                                className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 dark:text-white focus:ring-sky-500 focus:border-sky-500"
+                            >
+                                 {motorcycleModels.map(model => (
+                                     <option key={model} value={model}>{model}</option>
+                                 ))}
+                             </select>
+                        </div>
+                        <div className="flex-1">
+                            <label htmlFor="lookup-search" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tìm kiếm:</label>
+                             <input 
+                                id="lookup-search"
+                                type="text"
+                                placeholder="Tên hoặc mã phụ tùng..."
+                                value={lookupSearchTerm}
+                                onChange={e => setLookupSearchTerm(e.target.value)}
+                                className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 dark:text-white focus:ring-sky-500 focus:border-sky-500"
+                            />
+                        </div>
+                     </div>
+                     
+                    {/* Mobile Card View */}
+                    <div className="lg:hidden space-y-3">
+                        {paginatedReferenceParts.map((refPart, index) => (
+                             <div key={`${refPart.sku}-${index}`} className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-lg border dark:border-slate-600/50">
+                                <div className="flex justify-between items-start gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-semibold text-slate-800 dark:text-slate-100">{refPart.name}</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-1">{refPart.sku}</p>
+                                    </div>
+                                    <button onClick={() => handleAddFromReference(refPart)} className="px-3 py-1 bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300 text-sm font-semibold rounded-md hover:bg-sky-200 dark:hover:bg-sky-900 flex-shrink-0">
+                                        Thêm
+                                    </button>
+                                </div>
+                                <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-600/50 flex justify-between items-center">
+                                    <span className="text-sm text-slate-600 dark:text-slate-400">Giá tham khảo:</span>
+                                    <span className="font-bold text-slate-800 dark:text-slate-100">{formatCurrency(refPart.sellingPrice)}</span>
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="border-b dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 text-sm">
-                                <tr>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Tên Phụ tùng</th>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Mã (SKU)</th>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Giá tham khảo</th>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-center">Hành động</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {paginatedLookupParts.map(part => (
-                                     <tr key={part.sku} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                                        <td className="p-3 font-medium text-slate-800 dark:text-slate-200">{part.name}</td>
-                                        <td className="p-3 text-slate-500 dark:text-slate-400 font-mono text-xs">{part.sku}</td>
-                                        <td className="p-3 text-right font-semibold text-sky-600 dark:text-sky-400">{formatCurrency(part.sellingPrice)}</td>
-                                        <td className="p-3 text-center">
-                                            <button onClick={() => handleSelectPartFromLookup(part)} className="bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 font-semibold px-3 py-1 rounded-md text-sm hover:bg-sky-200 dark:hover:bg-sky-800/50">Thêm</button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                     {filteredLookupParts.length > LOOKUP_ITEMS_PER_PAGE && <Pagination currentPage={lookupPage} totalPages={Math.ceil(filteredLookupParts.length / LOOKUP_ITEMS_PER_PAGE)} onPageChange={setLookupPage} itemsPerPage={LOOKUP_ITEMS_PER_PAGE} totalItems={filteredLookupParts.length} />}
+
+                     {/* Desktop Table View */}
+                     <div className="hidden lg:block overflow-x-auto">
+                         <table className="w-full text-left">
+                             <thead className="bg-slate-100 dark:bg-slate-700">
+                                 <tr>
+                                     <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Tên Phụ tùng</th>
+                                     <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Mã (SKU)</th>
+                                     <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Giá tham khảo</th>
+                                     <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Hành động</th>
+                                 </tr>
+                             </thead>
+                             <tbody>
+                                 {paginatedReferenceParts.map((refPart, index) => (
+                                     <tr key={`${refPart.sku}-${index}`} className="border-b dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                         <td className="p-3 text-slate-800 dark:text-slate-200 font-medium">{refPart.name}</td>
+                                         <td className="p-3 text-slate-600 dark:text-slate-300 font-mono text-sm">{refPart.sku}</td>
+                                         <td className="p-3 text-slate-800 dark:text-slate-200 font-semibold text-right">{formatCurrency(refPart.sellingPrice)}</td>
+                                         <td className="p-3 text-right">
+                                             <button 
+                                                 onClick={() => handleAddFromReference(refPart)} 
+                                                 className="px-3 py-1 bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300 text-sm font-semibold rounded-md hover:bg-sky-200 dark:hover:bg-sky-900" 
+                                             >
+                                                 Thêm
+                                             </button>
+                                         </td>
+                                     </tr>
+                                 ))}
+                             </tbody>
+                         </table>
+                     </div>
+
+                     {paginatedReferenceParts.length === 0 && (
+                        <div className="text-center py-12 text-slate-500 dark:text-slate-400">
+                            <p>Không tìm thấy phụ tùng phù hợp.</p>
+                        </div>
+                     )}
+
+                     {totalLookupPages > 1 && (
+                        <div className="mt-4 flex justify-center items-center space-x-2">
+                            <button onClick={() => setLookupCurrentPage(p => Math.max(1, p - 1))} disabled={lookupCurrentPage === 1} className="px-3 py-1 border dark:border-slate-600 rounded-md disabled:opacity-50">&laquo;</button>
+                            <span className="text-sm dark:text-slate-300">Trang {lookupCurrentPage} / {totalLookupPages}</span>
+                            <button onClick={() => setLookupCurrentPage(p => Math.min(totalLookupPages, p + 1))} disabled={lookupCurrentPage === totalLookupPages} className="px-3 py-1 border dark:border-slate-600 rounded-md disabled:opacity-50">&raquo;</button>
+                        </div>
+                     )}
                  </div>
             )}
-             
-            {/* 4. LỊCH SỬ */}
+
              {activeTab === 'history' && (
-                <div className="space-y-4">
-                    <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Lịch sử Xuất/Nhập kho</h1>
-                    <input type="text" placeholder="Tìm kiếm theo tên phụ tùng, mã giao dịch, ghi chú..." value={historySearch} onChange={e => setHistorySearch(e.target.value)} className="w-full md:w-1/2 p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 dark:text-slate-100" />
-                     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="border-b dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 text-sm">
-                                <tr>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Ngày</th>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Loại</th>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Phụ tùng</th>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-center">Số lượng</th>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Đơn giá</th>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Tổng tiền</th>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Chi nhánh</th>
-                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Ghi chú</th>
-                                </tr>
-                            </thead>
-                             <tbody>
-                                {paginatedHistory.map(tx => (
-                                     <tr key={tx.id} className="border-b dark:border-slate-700">
-                                        <td className="p-2 text-slate-600 dark:text-slate-400 text-xs">{tx.date}</td>
-                                        <td className="p-2"><span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${tx.type === 'Nhập kho' ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'}`}>{tx.type}</span></td>
-                                        <td className="p-2 font-medium text-slate-800 dark:text-slate-200">{tx.partName}</td>
-                                        <td className="p-2 text-center font-bold text-slate-700 dark:text-slate-300">{tx.quantity}</td>
-                                        <td className="p-2 text-right text-slate-600 dark:text-slate-400">{formatCurrency(tx.unitPrice || 0)}</td>
-                                        <td className="p-2 text-right font-semibold text-slate-800 dark:text-slate-200">{formatCurrency(tx.totalPrice)}</td>
-                                        <td className="p-2 text-slate-600 dark:text-slate-400">{storeSettings.branches.find(b => b.id === tx.branchId)?.name || tx.branchId}</td>
-                                        <td className="p-2 text-slate-500 text-xs">{tx.notes}</td>
+                <div>
+                     <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100 mb-6">Lịch sử Xuất/Nhập kho</h1>
+                     <input type="text" placeholder="Tìm kiếm theo tên phụ tùng, mã giao dịch, ghi chú..." value={historySearchTerm} onChange={e => setHistorySearchTerm(e.target.value)} className="w-full p-3 border dark:border-slate-600 rounded-lg mb-6 text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800"/>
+                     <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md overflow-x-auto">
+                        <table className="w-full text-left min-w-max">
+                            <thead><tr className="bg-slate-50 dark:bg-slate-700/50 border-b dark:border-slate-700"><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Ngày</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Loại</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Phụ tùng</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Số lượng</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Đơn giá</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Tổng tiền</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Chi nhánh</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Ghi chú</th></tr></thead>
+                            <tbody>
+                                {filteredTransactions.map(tx => (
+                                    <tr key={tx.id} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                        <td className="p-3 text-slate-700 dark:text-slate-300">{tx.date}</td>
+                                        <td className="p-3"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${tx.type === 'Nhập kho' ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'}`}>{tx.type}</span></td>
+                                        <td className="p-3 font-medium text-slate-900 dark:text-slate-100">{tx.partName}</td>
+                                        <td className="p-3 text-slate-800 dark:text-slate-200">{tx.quantity}</td>
+                                        <td className="p-3 text-slate-800 dark:text-slate-200">{formatCurrency(tx.unitPrice || 0)}</td>
+                                        <td className="p-3 text-slate-900 dark:text-slate-100 font-semibold">{formatCurrency(tx.totalPrice || 0)}</td>
+                                        <td className="p-3 text-slate-700 dark:text-slate-300">{storeSettings.branches.find(b => b.id === tx.branchId)?.name || tx.branchId}</td>
+                                        <td className="p-3 text-sm text-slate-600 dark:text-slate-400">{tx.notes}</td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
-                         {paginatedHistory.length === 0 && <p className="text-center p-8 text-slate-500 dark:text-slate-400">Không có giao dịch nào.</p>}
+                        {filteredTransactions.length === 0 && <p className="text-center py-8 text-slate-500 dark:text-slate-400">Không tìm thấy giao dịch nào.</p>}
                     </div>
-                     {filteredHistory.length > HISTORY_ITEMS_PER_PAGE && <Pagination currentPage={historyPage} totalPages={Math.ceil(filteredHistory.length / HISTORY_ITEMS_PER_PAGE)} onPageChange={setHistoryPage} itemsPerPage={HISTORY_ITEMS_PER_PAGE} totalItems={filteredHistory.length} />}
-            </div>
+                </div>
             )}
         </div>
     );
