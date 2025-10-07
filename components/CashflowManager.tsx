@@ -1,8 +1,7 @@
-
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { CashTransaction, PaymentSource, Customer, Supplier, Contact, ContactType } from '../types';
 import { BuildingLibraryIcon, ArrowDownCircleIcon, ArrowUpCircleIcon, PlusIcon, XMarkIcon, Cog6ToothIcon, PencilSquareIcon } from './common/Icons';
+import Pagination from './common/Pagination';
 
 const formatCurrency = (amount: number) => {
     if (isNaN(amount)) return '0 ₫';
@@ -210,10 +209,13 @@ interface CashflowManagerProps {
     currentBranchId: string;
 }
 
+const ITEMS_PER_PAGE = 20;
+
 const CashflowManager: React.FC<CashflowManagerProps> = ({ cashTransactions, setCashTransactions, paymentSources, setPaymentSources, customers, suppliers, setCustomers, setSuppliers, currentBranchId }) => {
     const [modalState, setModalState] = useState<{ type: 'income' | 'expense' | null, isOpen: boolean }>({ type: null, isOpen: false });
     const [isContactModalOpen, setIsContactModalOpen] = useState(false);
     const [isSourceConfigOpen, setIsSourceConfigOpen] = useState(false); // Placeholder for future modal
+    const [currentPage, setCurrentPage] = useState(1);
 
     const today = new Date();
     const lastMonth = new Date(today);
@@ -222,6 +224,9 @@ const CashflowManager: React.FC<CashflowManagerProps> = ({ cashTransactions, set
     const [startDate, setStartDate] = useState(lastMonth.toISOString().split('T')[0]);
     const [endDate, setEndDate] = useState(today.toISOString().split('T')[0]);
 
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [startDate, endDate]);
 
     const combinedContacts = useMemo(() => {
         const allContacts: { id: string, name: string, phone?: string }[] = [];
@@ -303,6 +308,13 @@ const CashflowManager: React.FC<CashflowManagerProps> = ({ cashTransactions, set
           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [cashTransactions, startDate, endDate]);
 
+    const paginatedTransactions = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return filteredTransactions.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filteredTransactions, currentPage]);
+
+    const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE);
+
     const summary = useMemo(() => {
         return filteredTransactions.reduce((acc, tx) => {
             if (tx.type === 'income') acc.totalIncome += tx.amount;
@@ -332,13 +344,12 @@ const CashflowManager: React.FC<CashflowManagerProps> = ({ cashTransactions, set
             onSave={handleSaveContact}
         />
 
-        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 dark:text-slate-100">Quản lý Thu Chi</h1>
+        <div className="flex flex-col sm:flex-row justify-end sm:items-center gap-4">
             <div className="flex items-center gap-3">
-                 <button onClick={() => handleOpenModal('expense')} className="flex items-center gap-2 bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow-sm hover:bg-red-700">
+                 <button onClick={() => handleOpenModal('expense')} className="flex items-center gap-2 bg-red-100 text-red-700 font-semibold py-2 px-4 rounded-lg shadow-sm hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900/80">
                     <ArrowDownCircleIcon className="w-6 h-6" /> Tôi đã đưa
                 </button>
-                <button onClick={() => handleOpenModal('income')} className="flex items-center gap-2 bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-sm hover:bg-green-700">
+                <button onClick={() => handleOpenModal('income')} className="flex items-center gap-2 bg-green-100 text-green-700 font-semibold py-2 px-4 rounded-lg shadow-sm hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900/80">
                     <ArrowUpCircleIcon className="w-6 h-6" /> Tôi đã nhận
                 </button>
             </div>
@@ -353,11 +364,11 @@ const CashflowManager: React.FC<CashflowManagerProps> = ({ cashTransactions, set
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
                 <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Từ ngày</label>
-                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="mt-1 block w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm dark:bg-slate-700 dark:text-white" />
+                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="mt-1 block w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm dark:bg-slate-700 dark:text-white [color-scheme:light] dark:[color-scheme:dark]" />
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Đến ngày</label>
-                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="mt-1 block w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm dark:bg-slate-700 dark:text-white" />
+                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="mt-1 block w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm dark:bg-slate-700 dark:text-white [color-scheme:light] dark:[color-scheme:dark]" />
                 </div>
                 <div className="lg:col-span-3 flex flex-wrap items-end gap-2">
                     <button onClick={handleTodayClick} className="px-3 py-2 border dark:border-slate-600 rounded-md text-sm font-medium bg-slate-100 dark:bg-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600">Hôm nay</button>
@@ -371,18 +382,18 @@ const CashflowManager: React.FC<CashflowManagerProps> = ({ cashTransactions, set
 
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 overflow-x-auto">
             <table className="w-full text-left">
-                <thead className="border-b dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50">
-                    <tr>
-                        <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Thời gian</th>
-                        <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Đối tác</th>
-                        <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Nội dung</th>
-                        <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Đã thu</th>
-                        <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Đã chi</th>
-                        <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Nguồn tiền</th>
+                <thead className="border-b dark:border-slate-700">
+                    <tr className="bg-slate-100 dark:bg-slate-700/50">
+                        <th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Thời gian</th>
+                        <th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Đối tác</th>
+                        <th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Nội dung</th>
+                        <th className="p-3 font-semibold text-slate-700 dark:text-slate-300 text-right">Đã thu</th>
+                        <th className="p-3 font-semibold text-slate-700 dark:text-slate-300 text-right">Đã chi</th>
+                        <th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Nguồn tiền</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {filteredTransactions.length > 0 ? filteredTransactions.map(tx => {
+                    {paginatedTransactions.length > 0 ? paginatedTransactions.map(tx => {
                         const source = paymentSources.find(ps => ps.id === tx.paymentSourceId);
                         return (
                         <tr key={tx.id} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-sm">
@@ -403,6 +414,16 @@ const CashflowManager: React.FC<CashflowManagerProps> = ({ cashTransactions, set
                 </tbody>
             </table>
         </div>
+        
+        {filteredTransactions.length > 0 && (
+            <Pagination 
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                itemsPerPage={ITEMS_PER_PAGE}
+                totalItems={filteredTransactions.length}
+            />
+        )}
     </div>
   );
 };

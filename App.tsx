@@ -36,7 +36,9 @@ const mockWorkOrdersData: WorkOrder[] = [
         partsUsed: [
             { partId: 'P002', partName: 'Nhớt Motul 300V', sku: 'MOTUL-300V-1L', quantity: 1, price: 450000 }
         ],
-        notes: 'Khách yêu cầu kiểm tra thêm hệ thống điện và sạc.'
+        notes: 'Khách yêu cầu kiểm tra thêm hệ thống điện và sạc.',
+        odometerReading: 10000,
+        serviceTypes: ['Bảo dưỡng định kỳ', 'Thay nhớt']
     },
     { 
         id: 'S002', 
@@ -56,7 +58,29 @@ const mockWorkOrdersData: WorkOrder[] = [
         partsUsed: [
              { partId: 'P004', partName: 'Má phanh Bendix', sku: 'BENDIX-MD27', quantity: 1, price: 120000 }
         ],
-        notes: 'Cần thay má phanh gấp.'
+        notes: 'Cần thay má phanh gấp.',
+        odometerReading: 25000,
+        serviceTypes: ['Sửa chữa chung']
+    },
+    { 
+        id: 'S003', 
+        creationDate: '2024-08-15', // A later service
+        customerName: 'Nguyễn Văn A', 
+        customerPhone: '0901234567',
+        vehicleModel: 'Honda Air Blade', 
+        licensePlate: '59-A1 123.45',
+        issueDescription: 'Sửa đèn xi-nhan sau',
+        technicianName: 'Trần Văn An',
+        status: 'Trả máy', 
+        total: 80000,
+        branchId: 'main',
+        laborCost: 80000,
+        processingType: 'Sửa trực tiếp',
+        customerQuote: 80000,
+        partsUsed: [],
+        notes: 'Đã thay bóng đèn mới.',
+        odometerReading: 11750, // This reading will trigger the alert
+        serviceTypes: ['Sửa chữa chung']
     },
 ];
 
@@ -70,7 +94,7 @@ const mockPartsData: Part[] = [
 ];
 
 const mockCustomersData: Customer[] = [
-    { id: 'C001', name: 'Nguyễn Văn A', phone: '0901234567', vehicle: 'Honda Air Blade 2022', licensePlate: '59-A1 123.45', loyaltyPoints: 150 },
+    { id: 'C001', name: 'Nguyễn Văn A', phone: '0901234567', vehicle: 'Honda Air Blade 2022', licensePlate: '59-A1 123.45', loyaltyPoints: 150, lastServiceOdometer: 10000, lastServiceDate: '2024-07-30' },
     { id: 'C002', name: 'Trần Thị B', phone: '0987654321', vehicle: 'Yamaha Exciter 155', licensePlate: '72-B2 678.90', loyaltyPoints: 320 },
     { id: 'C003', name: 'Lê Hoàng Long', phone: '0912345678', vehicle: 'Honda SH 150i', licensePlate: '29-C1 555.55', loyaltyPoints: 80 },
 ];
@@ -281,7 +305,7 @@ const App: React.FC = () => {
 
   return (
     <HashRouter>
-      <div className="flex h-screen bg-slate-50 dark:bg-slate-900/70 font-sans print:hidden">
+      <div className="flex h-screen bg-slate-50 dark:bg-slate-900 font-sans print:hidden">
         <Sidebar 
           currentUser={currentUser} 
           users={users}
@@ -310,7 +334,7 @@ const App: React.FC = () => {
           <main className="flex-1 overflow-y-auto p-6 lg:p-8">
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard workOrders={workOrders} transactions={transactions} parts={parts} currentBranchId={currentBranchId} />} />
+              <Route path="/dashboard" element={<Dashboard workOrders={workOrders} customers={customers} parts={parts} currentBranchId={currentBranchId} />} />
               <Route path="/services" element={<ServiceManager currentUser={currentUser} workOrders={workOrders} setWorkOrders={setWorkOrders} parts={parts} storeSettings={storeSettings} currentBranchId={currentBranchId} customers={customers} setCustomers={setCustomers} />} />
               <Route path="/sales" element={<SalesManager 
                 currentUser={currentUser}

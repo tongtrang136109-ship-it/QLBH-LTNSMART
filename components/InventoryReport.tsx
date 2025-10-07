@@ -1,7 +1,7 @@
-
 import React, { useState, useMemo } from 'react';
 import type { Part, InventoryTransaction, StoreSettings } from '../types';
 import { ArchiveBoxIcon, ClockIcon, ExclamationTriangleIcon } from './common/Icons';
+import Pagination from './common/Pagination';
 
 // Enhanced Part type for the report
 type ReportPart = Part & {
@@ -24,16 +24,18 @@ type SortConfig = {
     direction: 'ascending' | 'descending';
 } | null;
 
+const ITEMS_PER_PAGE = 20;
+
 // Fix: Changed icon prop type to React.ReactElement to ensure it's a clonable element, fixing the type error with React.cloneElement.
 // Fix: Use React.ReactElement<any> to allow passing props like className without causing a TypeScript error.
 const StatCard: React.FC<{ icon: React.ReactElement<any>; title: string; value: number; color: string; }> = ({ icon, title, value, color }) => (
-    <div className="bg-white p-5 rounded-xl shadow-sm flex items-center border border-slate-200/60">
+    <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm flex items-center border border-slate-200/60 dark:border-slate-700">
         <div className={`p-4 rounded-full ${color}`}>
             {React.cloneElement(icon, { className: 'w-7 h-7 text-white' })}
         </div>
         <div className="ml-4">
-            <p className="text-sm text-slate-500 font-medium">{title}</p>
-            <p className="text-xl sm:text-2xl font-bold text-slate-800">{value}</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">{title}</p>
+            <p className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100">{value}</p>
         </div>
     </div>
 );
@@ -41,6 +43,12 @@ const StatCard: React.FC<{ icon: React.ReactElement<any>; title: string; value: 
 const InventoryReport: React.FC<InventoryReportProps> = ({ parts, transactions, currentBranchId, storeSettings }) => {
     const [activeTab, setActiveTab] = useState<ReportCategory>('low-stock');
     const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+
+    React.useEffect(() => {
+        setCurrentPage(1);
+        setSortConfig(null);
+    }, [activeTab]);
 
     const reportData = useMemo(() => {
         const today = new Date();
@@ -128,6 +136,13 @@ const InventoryReport: React.FC<InventoryReportProps> = ({ parts, transactions, 
         return sortableItems;
     }, [reportData, activeTab, sortConfig]);
 
+    const paginatedData = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return sortedData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [sortedData, currentPage]);
+    
+    const totalPages = Math.ceil(sortedData.length / ITEMS_PER_PAGE);
+
     const requestSort = (key: string) => {
         let direction: 'ascending' | 'descending' = 'ascending';
         if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
@@ -137,7 +152,7 @@ const InventoryReport: React.FC<InventoryReportProps> = ({ parts, transactions, 
     };
 
     const getSortIndicator = (key: string) => {
-        if (!sortConfig || sortConfig.key !== key) return <span className="text-slate-400">↑↓</span>;
+        if (!sortConfig || sortConfig.key !== key) return <span className="text-slate-400 dark:text-slate-500">↑↓</span>;
         return sortConfig.direction === 'ascending' ? '▲' : '▼';
     };
 
@@ -166,38 +181,78 @@ const InventoryReport: React.FC<InventoryReportProps> = ({ parts, transactions, 
     
     return (
         <div className="space-y-6">
-            <div className="flex items-center">
-                <ArchiveBoxIcon className="w-8 h-8 text-indigo-600" />
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 ml-3">Báo cáo Tồn kho</h1>
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <StatCard icon={<ExclamationTriangleIcon />} title="Sắp hết hàng" value={reportData['low-stock'].length} color="bg-amber-500" />
                 <StatCard icon={<ClockIcon />} title="Sắp hết hạn" value={reportData['expiring-soon'].length} color="bg-red-500" />
                 <StatCard icon={<ArchiveBoxIcon />} title="Tồn kho lâu" value={reportData['slow-moving'].length} color="bg-sky-500" />
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200/60">
-                <div className="border-b border-slate-200">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200/60 dark:border-slate-700">
+                <div className="border-b border-slate-200 dark:border-slate-700">
                     <nav className="-mb-px flex space-x-8 px-6" aria-label="Tabs">
-                        <button onClick={() => { setActiveTab('low-stock'); setSortConfig(null); }} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'low-stock' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>
+                        <button onClick={() => setActiveTab('low-stock')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'low-stock' ? 'border-indigo-500 dark:border-indigo-400 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'}`}>
                             Hàng sắp hết ({reportData['low-stock'].length})
                         </button>
-                        <button onClick={() => { setActiveTab('expiring-soon'); setSortConfig(null); }} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'expiring-soon' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>
+                        <button onClick={() => setActiveTab('expiring-soon')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'expiring-soon' ? 'border-indigo-500 dark:border-indigo-400 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'}`}>
                             Hàng sắp hết hạn ({reportData['expiring-soon'].length})
                         </button>
-                        <button onClick={() => { setActiveTab('slow-moving'); setSortConfig(null); }} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'slow-moving' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>
+                        <button onClick={() => setActiveTab('slow-moving')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'slow-moving' ? 'border-indigo-500 dark:border-indigo-400 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'}`}>
                             Hàng tồn kho lâu ({reportData['slow-moving'].length})
                         </button>
                     </nav>
                 </div>
-                <div className="p-6">
-                    <div className="overflow-x-auto">
+                <div className="p-4 sm:p-6">
+                    {/* Mobile Card View */}
+                    <div className="lg:hidden space-y-4">
+                         {paginatedData.length > 0 ? paginatedData.map(part => (
+                            <div key={part.id} className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-slate-200 dark:border-slate-600 space-y-3">
+                                <div>
+                                    <p className="font-semibold text-slate-800 dark:text-slate-100">{part.name}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">{part.sku}</p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm border-t border-b border-slate-200 dark:border-slate-600 py-3">
+                                    {storeSettings.branches.map(branch => {
+                                        const stock = part.stock[branch.id] || 0;
+                                        return (
+                                            <div key={branch.id}>
+                                                <span className="text-slate-500 dark:text-slate-400">{branch.name}: </span>
+                                                <span className={`font-bold ${stock > 0 && stock < 5 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                                    {stock}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <div>
+                                    {activeTab === 'expiring-soon' && part.expiryDate && (
+                                        <div className="flex items-center text-sm text-red-600 dark:text-red-400">
+                                             <ExclamationTriangleIcon className="w-4 h-4 mr-2"/>
+                                            <span className="font-medium">Hết hạn vào: {part.expiryDate}</span>
+                                        </div>
+                                    )}
+                                    {activeTab === 'slow-moving' && part.daysSinceLastSale !== undefined && (
+                                         <div className="flex items-center text-sm">
+                                             <ClockIcon className="w-4 h-4 mr-2 text-sky-600 dark:text-sky-400"/>
+                                             <span className="text-slate-600 dark:text-slate-300">Chưa bán trong: </span>
+                                             <span className="font-bold text-sky-600 dark:text-sky-400 ml-1">{part.daysSinceLastSale} ngày</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                         )) : (
+                            <div className="text-center p-8 text-slate-500 dark:text-slate-400">
+                                Không có sản phẩm nào trong danh mục này.
+                            </div>
+                         )}
+                    </div>
+
+                    {/* Desktop Table View */}
+                    <div className="hidden lg:block overflow-x-auto">
                         <table className="w-full text-left min-w-max">
-                            <thead className="border-b border-slate-200">
-                                <tr className="bg-slate-50">
+                            <thead className="border-b border-slate-200 dark:border-slate-700">
+                                <tr className="bg-slate-50 dark:bg-slate-700/50">
                                     {visibleHeaders.map(header => (
-                                        <th key={header.key} className="p-4 font-semibold text-slate-600">
+                                        <th key={header.key} className="p-4 font-semibold text-slate-600 dark:text-slate-300">
                                              <div onClick={() => requestSort(header.key)} className="flex items-center space-x-2 cursor-pointer select-none">
                                                 <span>{header.label}</span>
                                                 <span className="text-slate-500">{getSortIndicator(header.key)}</span>
@@ -207,31 +262,31 @@ const InventoryReport: React.FC<InventoryReportProps> = ({ parts, transactions, 
                                 </tr>
                             </thead>
                             <tbody>
-                                {sortedData.length > 0 ? sortedData.map(part => (
-                                    <tr key={part.id} className="border-b border-slate-200 hover:bg-slate-50">
+                                {paginatedData.length > 0 ? paginatedData.map(part => (
+                                    <tr key={part.id} className="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
                                         {visibleHeaders.map(header => {
                                             if(header.key.startsWith('stock_')) {
                                                 const branchId = header.key.substring(6);
                                                 const stock = part.stock[branchId] || 0;
                                                 return (
-                                                    <td key={header.key} className={`p-4 font-medium ${stock > 0 && stock < 5 ? 'text-amber-600 font-bold' : 'text-slate-900'}`}>
+                                                    <td key={header.key} className={`p-4 font-medium ${stock > 0 && stock < 5 ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-slate-900 dark:text-slate-100'}`}>
                                                         {stock}
                                                     </td>
                                                 )
                                             }
                                             switch (header.key) {
-                                                case 'name': return <td key={header.key} className="p-4 text-slate-900 font-semibold">{part.name}</td>;
-                                                case 'sku': return <td key={header.key} className="p-4 text-slate-600">{part.sku}</td>;
-                                                case 'expiryDate': return <td key={header.key} className="p-4 text-red-600 font-medium">{part.expiryDate}</td>;
-                                                case 'lastSoldDate': return <td key={header.key} className="p-4 text-slate-700">{part.lastSoldDate || 'Chưa bán'}</td>;
-                                                case 'daysSinceLastSale': return <td key={header.key} className="p-4 text-sky-600 font-medium">{part.daysSinceLastSale}</td>;
+                                                case 'name': return <td key={header.key} className="p-4 text-slate-900 dark:text-slate-100 font-semibold">{part.name}</td>;
+                                                case 'sku': return <td key={header.key} className="p-4 text-slate-600 dark:text-slate-300">{part.sku}</td>;
+                                                case 'expiryDate': return <td key={header.key} className="p-4 text-red-600 dark:text-red-400 font-medium">{part.expiryDate}</td>;
+                                                case 'lastSoldDate': return <td key={header.key} className="p-4 text-slate-700 dark:text-slate-200">{part.lastSoldDate || 'Chưa bán'}</td>;
+                                                case 'daysSinceLastSale': return <td key={header.key} className="p-4 text-sky-600 dark:text-sky-400 font-medium">{part.daysSinceLastSale}</td>;
                                                 default: return <td key={header.key}></td>;
                                             }
                                         })}
                                     </tr>
                                 )) : (
                                     <tr>
-                                        <td colSpan={visibleHeaders.length} className="text-center p-8 text-slate-500">
+                                        <td colSpan={visibleHeaders.length} className="text-center p-8 text-slate-500 dark:text-slate-400">
                                             Không có sản phẩm nào trong danh mục này.
                                         </td>
                                     </tr>
@@ -239,6 +294,15 @@ const InventoryReport: React.FC<InventoryReportProps> = ({ parts, transactions, 
                             </tbody>
                         </table>
                     </div>
+                    {sortedData.length > 0 && (
+                        <Pagination 
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={setCurrentPage}
+                            itemsPerPage={ITEMS_PER_PAGE}
+                            totalItems={sortedData.length}
+                        />
+                    )}
                 </div>
             </div>
         </div>

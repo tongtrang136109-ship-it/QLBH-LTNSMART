@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Part, Supplier, ReceiptItem, StoreSettings, InventoryTransaction } from '../types';
@@ -8,6 +7,68 @@ const formatCurrency = (amount: number) => {
     if (isNaN(amount)) return '0';
     return new Intl.NumberFormat('vi-VN').format(amount);
 };
+
+// --- Camera Capture Modal ---
+const CameraCaptureModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    onCapture: (blob: Blob) => void;
+}> = ({ isOpen, onClose, onCapture }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+
+    useEffect(() => {
+        if (isOpen) {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    streamRef.current = stream;
+                    if (videoRef.current) {
+                        videoRef.current.srcObject = stream;
+                    }
+                })
+                .catch(err => {
+                    console.error("Error accessing camera: ", err);
+                    alert("Không thể truy cập camera. Vui lòng kiểm tra quyền truy cập trong trình duyệt.");
+                    onClose();
+                });
+        }
+
+        return () => {
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => track.stop());
+                streamRef.current = null;
+            }
+        };
+    }, [isOpen, onClose]);
+
+    const handleCaptureClick = () => {
+        if (videoRef.current) {
+            const canvas = document.createElement('canvas');
+            canvas.width = videoRef.current.videoWidth;
+            canvas.height = videoRef.current.videoHeight;
+            const context = canvas.getContext('2d');
+            context?.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(blob => {
+                if (blob) {
+                    onCapture(blob);
+                }
+            }, 'image/jpeg', 0.95);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-80 z-[60] flex flex-col justify-center items-center p-4">
+            <video ref={videoRef} autoPlay playsInline className="w-full max-w-lg rounded-lg mb-4 border-2 border-slate-600"></video>
+            <div className="flex space-x-4">
+                <button onClick={onClose} className="bg-slate-200 text-slate-800 font-semibold py-2 px-6 rounded-lg hover:bg-slate-300">Hủy</button>
+                <button onClick={handleCaptureClick} className="bg-sky-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-sky-700">Chụp ảnh</button>
+            </div>
+        </div>
+    );
+};
+
 
 // --- Modals ---
 const PartModal: React.FC<{
@@ -26,6 +87,11 @@ const PartModal: React.FC<{
     const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
 
+    // State for image upload and camera
+    const [image, setImage] = useState<{ file: File | Blob; previewUrl: string } | null>(null);
+    const [isCameraOpen, setIsCameraOpen] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     useEffect(() => {
         if (isOpen) {
             // Reset form and category state when modal is opened
@@ -35,6 +101,8 @@ const PartModal: React.FC<{
             setLocalCategories(allCategories);
             setIsAddingNewCategory(false);
             setNewCategoryName('');
+            setImage(null);
+            setIsCameraOpen(false);
         }
     }, [isOpen, allCategories]);
 
@@ -72,6 +140,28 @@ const PartModal: React.FC<{
         setIsAddingNewCategory(false);
     };
 
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file && file.type.startsWith('image/')) {
+            setImage({
+                file: file,
+                previewUrl: URL.createObjectURL(file),
+            });
+        }
+        if(event.target) {
+            event.target.value = ''; // Allow re-uploading the same file
+        }
+    };
+
+    const handleCapture = (blob: Blob) => {
+        const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        setImage({
+            file: file,
+            previewUrl: URL.createObjectURL(file),
+        });
+        setIsCameraOpen(false);
+    };
+
     const handleSave = () => {
         const existingPart = parts.find(p => p.name.toLowerCase() === formData.name.toLowerCase() || p.sku.toLowerCase() === formData.sku.toLowerCase());
         const newPartData: Part = {
@@ -93,35 +183,59 @@ const PartModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[95vh] flex flex-col">
-                <div className="p-4 border-b flex justify-between items-center">
-                    <h2 className="text-lg sm:text-xl font-bold text-slate-800">Thêm sản phẩm mới</h2>
-                    <button onClick={onClose}><XMarkIcon className="w-6 h-6 text-slate-500" /></button>
+            <CameraCaptureModal
+                isOpen={isCameraOpen}
+                onClose={() => setIsCameraOpen(false)}
+                onCapture={handleCapture}
+            />
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-2xl max-h-[95vh] flex flex-col">
+                <div className="p-4 border-b dark:border-slate-700 flex justify-between items-center">
+                    <h2 className="text-lg sm:text-xl font-bold text-slate-800 dark:text-slate-100">Thêm sản phẩm mới</h2>
+                    <button onClick={onClose}><XMarkIcon className="w-6 h-6 text-slate-500 dark:text-slate-300" /></button>
                 </div>
                 <div className="p-6 space-y-4 overflow-y-auto">
-                    <div className="p-4 bg-sky-50 border border-sky-200 rounded-lg flex items-center space-x-4">
-                        <button className="w-24 h-24 bg-slate-200 rounded-lg flex flex-col items-center justify-center text-slate-500 hover:bg-slate-300">
-                           <CameraIcon className="w-8 h-8"/>
-                           <span className="text-xs mt-1">Upload</span>
-                        </button>
-                        <p className="text-sm text-slate-600">Tải lên ảnh sản phẩm để dễ nhận biết và quản lý hơn.</p>
+                     <div className="p-4 bg-sky-50 dark:bg-sky-900/50 border border-sky-200 dark:border-sky-800 rounded-lg flex items-start space-x-4">
+                        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
+                        {image ? (
+                            <div className="relative w-24 h-24 flex-shrink-0">
+                                <img src={image.previewUrl} alt="Preview" className="w-full h-full object-cover rounded-lg shadow-md" />
+                                <button type="button" onClick={() => setImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-transform hover:scale-110">
+                                    <XMarkIcon className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="w-24 h-24 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <ArchiveBoxIcon className="w-10 h-10 text-slate-400 dark:text-slate-500"/>
+                            </div>
+                        )}
+                        <div>
+                            <p className="text-sm text-slate-600 dark:text-slate-300 mb-2">Tải lên ảnh sản phẩm để dễ nhận biết và quản lý hơn.</p>
+                            <div className="flex items-center space-x-2">
+                                <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold py-1.5 px-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600">
+                                    <PlusIcon className="w-4 h-4"/> Tải lên
+                                </button>
+                                <button type="button" onClick={() => setIsCameraOpen(true)} className="flex items-center gap-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold py-1.5 px-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600">
+                                    <CameraIcon className="w-4 h-4"/> Chụp ảnh
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700">Tên sản phẩm <span className="text-red-500">*</span></label>
-                        <input type="text" name="name" value={formData.name} onChange={handleFormChange} className="mt-1 w-full p-2 border rounded-md"/>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Tên sản phẩm <span className="text-red-500">*</span></label>
+                        <input type="text" name="name" value={formData.name} onChange={handleFormChange} className="mt-1 w-full p-2 border rounded-md bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100"/>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700">Mô tả</label>
-                        <textarea name="description" value={formData.description} onChange={handleFormChange} rows={2} className="mt-1 w-full p-2 border rounded-md"></textarea>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Mô tả</label>
+                        <textarea name="description" value={formData.description} onChange={handleFormChange} rows={2} className="mt-1 w-full p-2 border rounded-md bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100"></textarea>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700">Danh mục sản phẩm</label>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Danh mục sản phẩm</label>
                          <div className="flex items-center space-x-2 mt-1">
                             <select
                                 name="category"
                                 value={formData.category}
                                 onChange={handleFormChange}
-                                className="w-full p-2 border rounded-md bg-white focus:outline-none focus:ring-sky-500 focus:border-sky-500"
+                                className="w-full p-2 border rounded-md bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-sky-500 focus:border-sky-500"
                             >
                                 <option value="">-- Chọn hoặc tạo mới --</option>
                                 {localCategories.map(cat => (
@@ -131,10 +245,10 @@ const PartModal: React.FC<{
                             <button
                                 type="button"
                                 onClick={() => setIsAddingNewCategory(prev => !prev)}
-                                className="p-2.5 bg-slate-100 rounded-md hover:bg-slate-200 flex-shrink-0"
+                                className="p-2.5 bg-slate-100 dark:bg-slate-700 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 flex-shrink-0"
                                 title="Thêm danh mục mới"
                             >
-                                <PlusIcon className="w-5 h-5 text-slate-700" />
+                                <PlusIcon className="w-5 h-5 text-slate-700 dark:text-slate-200" />
                             </button>
                         </div>
                         {isAddingNewCategory && (
@@ -144,7 +258,7 @@ const PartModal: React.FC<{
                                     value={newCategoryName}
                                     onChange={e => setNewCategoryName(e.target.value)}
                                     placeholder="Tên danh mục mới..."
-                                    className="block w-full p-2 border rounded-md focus:outline-none focus:ring-sky-500 focus:border-sky-500"
+                                    className="block w-full p-2 border rounded-md bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-sky-500 focus:border-sky-500"
                                     autoFocus
                                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddNewCategory(); } }}
                                 />
@@ -158,28 +272,28 @@ const PartModal: React.FC<{
                             </div>
                         )}
                     </div>
-                    <div className="border-t pt-4">
-                        <p className="font-semibold text-slate-700">Thông tin nhập kho:</p>
+                    <div className="border-t pt-4 dark:border-slate-700">
+                        <p className="font-semibold text-slate-700 dark:text-slate-200">Thông tin nhập kho:</p>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
                              <div>
-                                <label className="block text-sm font-medium text-slate-700">Số lượng:</label>
-                                <input type="number" name="quantity" value={formData.quantity} onChange={handleFormChange} className="mt-1 w-full p-2 border rounded-md"/>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Số lượng:</label>
+                                <input type="number" name="quantity" value={formData.quantity} onChange={handleFormChange} className="mt-1 w-full p-2 border rounded-md bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100"/>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Giá nhập:</label>
-                                <input type="number" name="price" value={formData.price} onChange={handleFormChange} className="mt-1 w-full p-2 border rounded-md"/>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Giá nhập:</label>
+                                <input type="number" name="price" value={formData.price} onChange={handleFormChange} className="mt-1 w-full p-2 border rounded-md bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100"/>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Giá bán lẻ:</label>
-                                <input type="number" name="sellingPrice" value={formData.sellingPrice} onChange={handleFormChange} className="mt-1 w-full p-2 border rounded-md"/>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Giá bán lẻ:</label>
+                                <input type="number" name="sellingPrice" value={formData.sellingPrice} onChange={handleFormChange} className="mt-1 w-full p-2 border rounded-md bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100"/>
                             </div>
                         </div>
                     </div>
-                     <div className="border-t pt-4">
-                         <label className="block text-sm font-medium text-slate-700 mb-1">Bảo hành</label>
+                     <div className="border-t pt-4 dark:border-slate-700">
+                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Bảo hành</label>
                         <div className="flex items-center space-x-2">
-                            <input type="number" value={warrantyValue} onChange={e => setWarrantyValue(parseInt(e.target.value) || 0)} className="w-20 p-2 border rounded-md"/>
-                            <select value={warrantyUnit} onChange={e => setWarrantyUnit(e.target.value)} className="p-2 border rounded-md bg-white">
+                            <input type="number" value={warrantyValue} onChange={e => setWarrantyValue(parseInt(e.target.value) || 0)} className="w-20 p-2 border rounded-md bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100"/>
+                            <select value={warrantyUnit} onChange={e => setWarrantyUnit(e.target.value)} className="p-2 border rounded-md bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100">
                                 <option value="ngày">ngày</option>
                                 <option value="tuần">tuần</option>
                                 <option value="tháng">tháng</option>
@@ -188,7 +302,7 @@ const PartModal: React.FC<{
                         </div>
                     </div>
                 </div>
-                 <div className="p-4 bg-slate-50 border-t flex justify-end">
+                 <div className="p-4 bg-slate-50 dark:bg-slate-800 border-t dark:border-slate-700 flex justify-end">
                     <button onClick={handleSave} className="bg-orange-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-orange-600">Lưu và Thêm vào giỏ hàng</button>
                 </div>
             </div>
@@ -226,22 +340,22 @@ const SupplierModal: React.FC<{
     
     return (
          <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
-                <div className="p-4 border-b flex justify-between items-center">
-                    <h2 className="text-lg sm:text-xl font-bold text-slate-800">Thêm nhà cung cấp</h2>
-                    <button onClick={onClose}><XMarkIcon className="w-6 h-6 text-slate-500" /></button>
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg">
+                <div className="p-4 border-b dark:border-slate-700 flex justify-between items-center">
+                    <h2 className="text-lg sm:text-xl font-bold text-slate-800 dark:text-slate-100">Thêm nhà cung cấp</h2>
+                    <button onClick={onClose}><XMarkIcon className="w-6 h-6 text-slate-500 dark:text-slate-300" /></button>
                 </div>
                  <div className="p-6 space-y-4">
                      <div>
-                        <label>Tên nhà cung cấp (*)</label>
-                        <input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full p-2 border rounded-md mt-1"/>
+                        <label className="dark:text-slate-300">Tên nhà cung cấp (*)</label>
+                        <input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full p-2 border rounded-md mt-1 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100"/>
                      </div>
                       <div>
-                        <label>Điện thoại</label>
-                        <input type="text" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full p-2 border rounded-md mt-1"/>
+                        <label className="dark:text-slate-300">Điện thoại</label>
+                        <input type="text" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full p-2 border rounded-md mt-1 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100"/>
                      </div>
                  </div>
-                 <div className="p-4 bg-slate-50 border-t flex justify-end">
+                 <div className="p-4 bg-slate-50 dark:bg-slate-800 border-t dark:border-slate-700 flex justify-end">
                     <button onClick={handleSave} className="bg-orange-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-orange-600">Lưu</button>
                 </div>
             </div>
@@ -432,11 +546,11 @@ const CreateGoodsReceipt: React.FC<CreateGoodsReceiptProps> = ({ parts, setParts
             )}
 
             {/* Left Panel: Product Selection */}
-            <div className={`${mobileView === 'products' ? 'flex' : 'hidden'} lg:flex flex-col bg-white p-4 lg:p-6 rounded-lg shadow-sm border border-slate-200/60 h-full lg:flex-1`}>
+            <div className={`${mobileView === 'products' ? 'flex' : 'hidden'} lg:flex flex-col bg-white dark:bg-slate-800 p-4 lg:p-6 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 h-full lg:flex-1`}>
                 <div className="flex justify-between items-center mb-4 flex-shrink-0">
-                    <h1 className="text-lg sm:text-xl font-bold text-slate-800">Chọn sản phẩm nhập kho</h1>
+                    <h1 className="text-lg sm:text-xl font-bold text-slate-800 dark:text-slate-100">Chọn sản phẩm nhập kho</h1>
                      <div className="flex items-center space-x-3">
-                        <button onClick={() => navigate('/inventory')} className="flex items-center bg-slate-200 text-slate-800 font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-slate-300">
+                        <button onClick={() => navigate('/inventory')} className="flex items-center bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-slate-300 dark:hover:bg-slate-600">
                             <ArrowUturnLeftIcon className="w-5 h-5"/>
                         </button>
                         <button onClick={() => setIsPartModalOpen(true)} className="flex items-center bg-sky-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-sky-700">
@@ -444,20 +558,20 @@ const CreateGoodsReceipt: React.FC<CreateGoodsReceiptProps> = ({ parts, setParts
                         </button>
                     </div>
                 </div>
-                <input type="text" placeholder="Tìm theo tên sản phẩm, SKU..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg mb-4 text-slate-900 flex-shrink-0"/>
+                <input type="text" placeholder="Tìm theo tên sản phẩm, SKU..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg mb-4 text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-700 flex-shrink-0"/>
                 <div className="flex-1 overflow-y-auto space-y-2 pr-2 -mr-2">
                     {filteredParts.map(part => (
-                        <div key={part.id} className="bg-slate-50 p-2 rounded-lg flex items-center justify-between border border-slate-200">
+                        <div key={part.id} className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded-lg flex items-center justify-between border border-slate-200 dark:border-slate-600/50">
                              <div className="flex items-center overflow-hidden">
-                                <div className="w-10 h-10 bg-slate-200 rounded-md flex items-center justify-center mr-3 flex-shrink-0">
-                                    <ArchiveBoxIcon className="w-6 h-6 text-slate-500" />
+                                <div className="w-10 h-10 bg-slate-200 dark:bg-slate-600 rounded-md flex items-center justify-center mr-3 flex-shrink-0">
+                                    <ArchiveBoxIcon className="w-6 h-6 text-slate-500 dark:text-slate-400" />
                                 </div>
                                  <div className="overflow-hidden">
-                                    <p className="font-semibold text-slate-800 text-sm truncate">{part.name}</p>
-                                    <p className="text-xs text-slate-500 truncate">{part.sku} | Tồn kho: {part.stock[currentBranchId] || 0}</p>
+                                    <p className="font-semibold text-slate-800 dark:text-slate-200 text-sm truncate">{part.name}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{part.sku} | Tồn kho: {part.stock[currentBranchId] || 0}</p>
                                 </div>
                             </div>
-                             <button onClick={() => handleAddToCart(part)} className="p-2 bg-sky-100 text-sky-700 rounded-full hover:bg-sky-200 flex-shrink-0 ml-2">
+                             <button onClick={() => handleAddToCart(part)} className="p-2 bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 rounded-full hover:bg-sky-200 dark:hover:bg-sky-800/50 flex-shrink-0 ml-2">
                                <PlusIcon className="w-5 h-5"/>
                             </button>
                         </div>
@@ -466,17 +580,17 @@ const CreateGoodsReceipt: React.FC<CreateGoodsReceiptProps> = ({ parts, setParts
             </div>
 
             {/* Right Panel: Cart & Finalization */}
-            <div className={`${mobileView === 'cart' ? 'flex' : 'hidden'} lg:flex w-full lg:w-[520px] flex-shrink-0 bg-white p-4 lg:p-6 rounded-lg shadow-sm border border-slate-200/60 flex-col h-full`}>
+            <div className={`${mobileView === 'cart' ? 'flex' : 'hidden'} lg:flex w-full lg:w-[520px] flex-shrink-0 bg-white dark:bg-slate-800 p-4 lg:p-6 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 flex-col h-full`}>
                 <div className="lg:hidden flex items-center mb-4 flex-shrink-0">
-                    <button onClick={() => setMobileView('products')} className="p-2 mr-2 -ml-2 text-slate-600">
+                    <button onClick={() => setMobileView('products')} className="p-2 mr-2 -ml-2 text-slate-600 dark:text-slate-300">
                         <ArrowUturnLeftIcon className="w-6 h-6" />
                     </button>
-                    <h2 className="text-lg font-semibold text-slate-800">Hoàn tất Phiếu nhập</h2>
+                    <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Hoàn tất Phiếu nhập</h2>
                 </div>
 
                 {receiptCart.length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-500">
-                        <ShoppingCartIcon className="w-16 h-16 text-slate-300 mb-4" />
+                    <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-500 dark:text-slate-400">
+                        <ShoppingCartIcon className="w-16 h-16 text-slate-300 dark:text-slate-600 mb-4" />
                         <h2 className="text-lg font-semibold">Giỏ hàng nhập kho</h2>
                         <p>Vui lòng thêm sản phẩm cần nhập vào giỏ hàng.</p>
                     </div>
@@ -484,25 +598,25 @@ const CreateGoodsReceipt: React.FC<CreateGoodsReceiptProps> = ({ parts, setParts
                     <>
                     <div className="flex-1 overflow-y-auto pr-3 -mr-3 space-y-4">
                         <div ref={supplierInputRef}>
-                            <label className="block text-sm font-medium text-slate-700">Nhà cung cấp (NCC):</label>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Nhà cung cấp (NCC):</label>
                             <div className="relative mt-1">
                                 <div className="flex items-center">
                                 <input type="text" placeholder="Tìm nhà cung cấp" value={supplierSearch}
                                     onChange={e => { setSupplierSearch(e.target.value); setSelectedSupplierId(null); setIsSupplierListOpen(true); }}
                                     onFocus={() => setIsSupplierListOpen(true)}
-                                    className="w-full p-2 border border-slate-300 rounded-l-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500"
+                                    className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-l-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
                                 />
                                 <button type="button" onClick={() => setIsSupplierModalOpen(true)}
-                                    className="p-2 bg-slate-100 border-t border-b border-r border-slate-300 rounded-r-md hover:bg-slate-200 h-[42px]" title="Thêm NCC mới">
-                                    <PlusIcon className="w-5 h-5" />
+                                    className="p-2 bg-slate-100 dark:bg-slate-600 border-t border-b border-r border-slate-300 dark:border-slate-600 rounded-r-md hover:bg-slate-200 dark:hover:bg-slate-500 h-[42px]" title="Thêm NCC mới">
+                                    <PlusIcon className="w-5 h-5 text-slate-700 dark:text-slate-200" />
                                 </button>
                                 </div>
                                 {isSupplierListOpen && (
-                                <div className="absolute z-10 w-full bg-white border rounded-md mt-1 shadow-lg max-h-48 overflow-y-auto">
+                                <div className="absolute z-10 w-full bg-white dark:bg-slate-700 border dark:border-slate-600 rounded-md mt-1 shadow-lg max-h-48 overflow-y-auto">
                                     {filteredSuppliers.map(s => (
                                     <div key={s.id} onClick={() => { setSelectedSupplierId(s.id); setSupplierSearch(s.name); setIsSupplierListOpen(false); }}
-                                        className="p-2 hover:bg-slate-100 cursor-pointer text-sm">
-                                        {s.name} <span className="text-slate-500"> - {s.phone}</span>
+                                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-600 cursor-pointer text-sm text-slate-800 dark:text-slate-200">
+                                        {s.name} <span className="text-slate-500 dark:text-slate-400"> - {s.phone}</span>
                                     </div>
                                     ))}
                                 </div>
@@ -511,83 +625,83 @@ const CreateGoodsReceipt: React.FC<CreateGoodsReceiptProps> = ({ parts, setParts
                         </div>
 
                         <div>
-                            <h2 className="font-semibold text-slate-800 mb-2">Giỏ hàng nhập kho:</h2>
+                            <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-2">Giỏ hàng nhập kho:</h2>
                             <div className="space-y-3">
                                 {receiptCart.map(item => (
-                                    <div key={item.partId} className="bg-slate-50/70 p-3 rounded-lg border border-slate-200">
+                                    <div key={item.partId} className="bg-slate-50/70 dark:bg-slate-700/50 p-3 rounded-lg border border-slate-200 dark:border-slate-600">
                                         <div className="flex justify-between items-start mb-2">
-                                            <p className="font-medium text-sm text-slate-800 flex-1 pr-2">{item.partName}</p>
+                                            <p className="font-medium text-sm text-slate-800 dark:text-slate-200 flex-1 pr-2">{item.partName}</p>
                                             <button onClick={() => setReceiptCart(prev => prev.filter(p => p.partId !== item.partId))} className="text-red-500"><TrashIcon className="w-5 h-5"/></button>
                                         </div>
                                         
                                         <div className="grid grid-cols-3 gap-x-4 gap-y-2 items-center">
                                             {/* Row 1: Quantity */}
-                                            <div className="col-span-1 text-sm text-slate-600">Số lượng:</div>
+                                            <div className="col-span-1 text-sm text-slate-600 dark:text-slate-400">Số lượng:</div>
                                             <div className="col-span-2 flex items-center gap-1">
-                                                <button onClick={() => updateCartItem(item.partId, 'quantity', item.quantity - 1)} className="p-1 border rounded-md"><MinusIcon className="w-4 h-4"/></button>
-                                                <input type="number" value={item.quantity} onChange={e => updateCartItem(item.partId, 'quantity', parseInt(e.target.value))} className="w-12 text-center border-slate-300 rounded-md text-sm p-1"/>
-                                                <button onClick={() => updateCartItem(item.partId, 'quantity', item.quantity + 1)} className="p-1 border rounded-md"><PlusIcon className="w-4 h-4"/></button>
+                                                <button onClick={() => updateCartItem(item.partId, 'quantity', item.quantity - 1)} className="p-1 border dark:border-slate-500 rounded-md text-slate-600 dark:text-slate-300"><MinusIcon className="w-4 h-4"/></button>
+                                                <input type="number" value={item.quantity} onChange={e => updateCartItem(item.partId, 'quantity', parseInt(e.target.value))} className="w-12 text-center border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-md text-sm p-1"/>
+                                                <button onClick={() => updateCartItem(item.partId, 'quantity', item.quantity + 1)} className="p-1 border dark:border-slate-500 rounded-md text-slate-600 dark:text-slate-300"><PlusIcon className="w-4 h-4"/></button>
                                             </div>
                                             
                                             {/* Row 2: Purchase Price */}
-                                            <div className="col-span-1 text-sm text-slate-600">Giá nhập:</div>
+                                            <div className="col-span-1 text-sm text-slate-600 dark:text-slate-400">Giá nhập:</div>
                                             <div className="col-span-2">
-                                                <input type="number" value={item.purchasePrice} onChange={e => updateCartItem(item.partId, 'purchasePrice', parseFloat(e.target.value))} className="w-full p-1 border rounded-md text-right text-sm"/>
+                                                <input type="number" value={item.purchasePrice} onChange={e => updateCartItem(item.partId, 'purchasePrice', parseFloat(e.target.value))} className="w-full p-1 border rounded-md text-right text-sm bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-500 text-slate-900 dark:text-slate-100"/>
                                             </div>
                                             
                                             {/* Row 3: Selling Price */}
-                                            <div className="col-span-1 text-sm text-slate-600">Giá bán:</div>
+                                            <div className="col-span-1 text-sm text-slate-600 dark:text-slate-400">Giá bán:</div>
                                             <div className="col-span-2">
-                                                <input type="number" value={item.sellingPrice} onChange={e => updateCartItem(item.partId, 'sellingPrice', parseFloat(e.target.value))} className="w-full p-1 border rounded-md text-right text-sm"/>
+                                                <input type="number" value={item.sellingPrice} onChange={e => updateCartItem(item.partId, 'sellingPrice', parseFloat(e.target.value))} className="w-full p-1 border rounded-md text-right text-sm bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-500 text-slate-900 dark:text-slate-100"/>
                                             </div>
 
                                             {/* Row 4: Total */}
-                                            <div className="col-span-1 text-sm text-slate-600 font-semibold">Thành tiền:</div>
-                                            <div className="col-span-2 text-right font-semibold text-slate-900">
+                                            <div className="col-span-1 text-sm text-slate-600 dark:text-slate-300 font-semibold">Thành tiền:</div>
+                                            <div className="col-span-2 text-right font-semibold text-slate-900 dark:text-slate-100">
                                                 {formatCurrency(item.quantity * item.purchasePrice)}
                                             </div>
                                         </div>
                                         
                                         {/* Warnings */}
                                         <div className="mt-2 space-y-1">
-                                            {warnings[`${item.partId}-purchase-price`] && <p className="text-xs text-amber-700 flex items-center"><ExclamationTriangleIcon className="w-4 h-4 mr-1"/> {warnings[`${item.partId}-purchase-price`]}</p>}
-                                            {warnings[`${item.partId}-selling-price`] && <p className="text-xs text-amber-700 flex items-center"><ExclamationTriangleIcon className="w-4 h-4 mr-1"/> {warnings[`${item.partId}-selling-price`]}</p>}
-                                            {warnings[`${item.partId}-qty`] && <p className="text-xs text-amber-700 flex items-center"><ExclamationTriangleIcon className="w-4 h-4 mr-1"/> {warnings[`${item.partId}-qty`]}</p>}
+                                            {warnings[`${item.partId}-purchase-price`] && <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center"><ExclamationTriangleIcon className="w-4 h-4 mr-1"/> {warnings[`${item.partId}-purchase-price`]}</p>}
+                                            {warnings[`${item.partId}-selling-price`] && <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center"><ExclamationTriangleIcon className="w-4 h-4 mr-1"/> {warnings[`${item.partId}-selling-price`]}</p>}
+                                            {warnings[`${item.partId}-qty`] && <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center"><ExclamationTriangleIcon className="w-4 h-4 mr-1"/> {warnings[`${item.partId}-qty`]}</p>}
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         </div>
                         
-                        <div className="space-y-1 text-sm pt-2">
+                        <div className="space-y-1 text-sm pt-2 text-slate-800 dark:text-slate-200">
                             <div className="flex justify-between"><span>Tổng tiền hàng</span><span>{formatCurrency(cartSubtotal)}</span></div>
-                            <div className="flex justify-between items-center"><span>Giảm giá</span><input type="number" value={receiptDiscount || ''} onChange={e => setReceiptDiscount(parseFloat(e.target.value) || 0)} placeholder="0" className="w-24 p-1 border rounded-md text-right"/></div>
-                            <div className="flex justify-between font-bold text-lg"><span>Phải trả NCC</span><span className="text-sky-600">{formatCurrency(cartTotal)}</span></div>
+                            <div className="flex justify-between items-center"><span>Giảm giá</span><input type="number" value={receiptDiscount || ''} onChange={e => setReceiptDiscount(parseFloat(e.target.value) || 0)} placeholder="0" className="w-24 p-1 border rounded-md text-right bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-500 text-slate-900 dark:text-slate-100"/></div>
+                            <div className="flex justify-between font-bold text-lg"><span>Phải trả NCC</span><span className="text-sky-600 dark:text-sky-400">{formatCurrency(cartTotal)}</span></div>
                         </div>
 
-                        <div className="border-t pt-4 mt-2">
-                             <p className="font-semibold text-slate-800 mb-2">Thanh toán:</p>
-                             <div className="flex gap-4 text-sm">
+                        <div className="border-t pt-4 mt-2 dark:border-slate-600">
+                             <p className="font-semibold text-slate-800 dark:text-slate-200 mb-2">Thanh toán:</p>
+                             <div className="flex gap-4 text-sm text-slate-700 dark:text-slate-300">
                                 <label><input type="radio" name="paymentStatus" checked={paymentStatus === 'partial'} onChange={() => setPaymentStatus('partial')} className="mr-1"/> Thanh toán một phần</label>
                                 <label><input type="radio" name="paymentStatus" checked={paymentStatus === 'full'} onChange={() => setPaymentStatus('full')} className="mr-1"/> Thanh toán đủ</label>
                             </div>
-                            <div className="flex gap-4 text-sm mt-2">
+                            <div className="flex gap-4 text-sm mt-2 text-slate-700 dark:text-slate-300">
                                 <label><input type="radio" name="paymentMethod" checked={paymentMethod === 'cash'} onChange={() => setPaymentMethod('cash')} className="mr-1"/> Tiền mặt</label>
                                 <label><input type="radio" name="paymentMethod" checked={paymentMethod === 'transfer'} onChange={() => setPaymentMethod('transfer')} className="mr-1"/> Chuyển khoản</label>
                             </div>
                         </div>
-                         <div className="border-t pt-4 mt-2">
-                             <p className="font-semibold text-slate-800 mb-2">Thời gian nhập hàng:</p>
-                             <div className="flex gap-4 text-sm">
+                         <div className="border-t pt-4 mt-2 dark:border-slate-600">
+                             <p className="font-semibold text-slate-800 dark:text-slate-200 mb-2">Thời gian nhập hàng:</p>
+                             <div className="flex gap-4 text-sm text-slate-700 dark:text-slate-300">
                                 <label><input type="radio" name="receiptTime" checked={useCurrentTime} onChange={() => setUseCurrentTime(true)} className="mr-1"/> Thời gian hiện tại</label>
                                 <label><input type="radio" name="receiptTime" checked={!useCurrentTime} onChange={() => setUseCurrentTime(false)} className="mr-1"/> Tùy chỉnh</label>
                             </div>
                         </div>
                     </div>
 
-                    <div className="mt-auto pt-4 border-t flex-shrink-0">
+                    <div className="mt-auto pt-4 border-t dark:border-slate-700 flex-shrink-0">
                         <div className="flex justify-end gap-3">
-                            <button className="bg-slate-200 text-slate-800 font-bold py-3 px-6 rounded-lg hover:bg-slate-300">LƯU NHẬP</button>
+                            <button className="bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold py-3 px-6 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500">LƯU NHÁP</button>
                             <button onClick={handleFinalizeReceipt} className="bg-orange-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-orange-600">NHẬP KHO</button>
                         </div>
                     </div>

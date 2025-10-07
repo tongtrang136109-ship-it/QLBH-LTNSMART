@@ -62,6 +62,13 @@ export interface WorkOrderPart {
   price: number; // Selling price at the time of service
 }
 
+export interface QuotationItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+}
+
 export interface WorkOrder {
   id: string;
   creationDate: string;
@@ -76,10 +83,13 @@ export interface WorkOrder {
   branchId: string;
   laborCost: number;
   partsUsed?: WorkOrderPart[];
+  quotationItems?: QuotationItem[];
   notes?: string;
   processingType?: string;
   customerQuote?: number;
   discount?: number;
+  odometerReading?: number;
+  serviceTypes?: string[];
 }
 
 export interface Customer {
@@ -89,6 +99,8 @@ export interface Customer {
   vehicle: string;
   licensePlate: string;
   loyaltyPoints: number;
+  lastServiceOdometer?: number;
+  lastServiceDate?: string;
 }
 
 export interface InventoryTransaction {

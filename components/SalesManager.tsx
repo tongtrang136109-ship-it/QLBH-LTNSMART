@@ -1,6 +1,9 @@
+
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Part, CartItem, InventoryTransaction, User, StoreSettings, WorkOrder, Customer } from '../types';
-import { ShoppingCartIcon, TrashIcon, PrinterIcon, DocumentTextIcon, ChevronDownIcon, ArchiveBoxIcon, XMarkIcon, PencilSquareIcon, PlusIcon, MinusIcon, ClockIcon } from './common/Icons';
+import { ShoppingCartIcon, TrashIcon, PrinterIcon, DocumentTextIcon, ChevronDownIcon, ArchiveBoxIcon, XMarkIcon, PencilSquareIcon, PlusIcon, MinusIcon, ClockIcon, ArrowUturnLeftIcon } from './common/Icons';
+import Pagination from './common/Pagination';
 
 const formatCurrency = (amount: number) => {
     if (isNaN(amount)) return '0';
@@ -14,17 +17,20 @@ const NewCustomerModal: React.FC<{
     onSave: (customer: Customer) => void;
     initialName?: string;
 }> = ({ isOpen, onClose, onSave, initialName = '' }) => {
-    const [formData, setFormData] = useState<Omit<Customer, 'id' | 'loyaltyPoints'>>({ name: initialName, phone: '', vehicle: '', licensePlate: '' });
+    const [formData, setFormData] = useState<Omit<Customer, 'id' | 'loyaltyPoints' | 'lastServiceDate'>>({ name: initialName, phone: '', vehicle: '', licensePlate: '', lastServiceOdometer: undefined });
     
     React.useEffect(() => {
         if(isOpen) {
-            setFormData({ name: initialName, phone: '', vehicle: '', licensePlate: '' });
+            setFormData({ name: initialName, phone: '', vehicle: '', licensePlate: '', lastServiceOdometer: undefined });
         }
     }, [isOpen, initialName]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        const { name, value, type } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'number' ? (value === '' ? undefined : parseInt(value, 10)) : value
+        }));
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -33,6 +39,7 @@ const NewCustomerModal: React.FC<{
             id: `C${Date.now()}`,
             ...formData,
             loyaltyPoints: 0,
+            lastServiceDate: formData.lastServiceOdometer ? new Date().toISOString().split('T')[0] : undefined,
         };
         onSave(finalCustomer);
     };
@@ -41,23 +48,40 @@ const NewCustomerModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-70 z-[60] flex justify-center items-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg">
                 <form onSubmit={handleSubmit}>
                     <div className="p-6">
-                        <h2 className="text-2xl font-bold text-slate-800 mb-6">Thêm Khách hàng mới</h2>
+                        <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6">Thêm Khách hàng mới</h2>
                         <div className="space-y-4">
                             <div>
-                                <label htmlFor="new-customer-name" className="block text-sm font-medium text-slate-700">Tên khách hàng (*)</label>
-                                <input id="new-customer-name" type="text" name="name" value={formData.name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900" required autoFocus />
+                                <label htmlFor="new-customer-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Tên khách hàng (*)</label>
+                                <input id="new-customer-name" type="text" name="name" value={formData.name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" required autoFocus />
                             </div>
                             <div>
-                                <label htmlFor="new-customer-phone" className="block text-sm font-medium text-slate-700">Số điện thoại (*)</label>
-                                <input id="new-customer-phone" type="text" name="phone" value={formData.phone} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900" required />
+                                <label htmlFor="new-customer-phone" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Số điện thoại (*)</label>
+                                <input id="new-customer-phone" type="text" name="phone" value={formData.phone} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" required />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="new-customer-vehicle" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Dòng xe</label>
+                                    <input id="new-customer-vehicle" type="text" name="vehicle" value={formData.vehicle} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
+                                </div>
+                                <div>
+                                    <label htmlFor="new-customer-licensePlate" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Biển số xe</label>
+                                    <input id="new-customer-licensePlate" type="text" name="licensePlate" value={formData.licensePlate} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
+                                </div>
+                            </div>
+                            <div>
+                                <label htmlFor="new-customer-odometer" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Số ODO (km)</label>
+                                <input id="new-customer-odometer" type="number" name="lastServiceOdometer" value={formData.lastServiceOdometer || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
                             </div>
                         </div>
                     </div>
-                    <div className="bg-slate-50 px-6 py-4 flex justify-end space-x-3 border-t border-slate-200">
-                        <button type="button" onClick={onClose} className="bg-slate-200 text-slate-800 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300">Hủy</button>
+                    <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 flex justify-end space-x-3 border-t border-slate-200 dark:border-slate-700">
+                        <button type="button" onClick={onClose} className="flex items-center gap-2 bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">
+                            <ArrowUturnLeftIcon className="w-5 h-5" />
+                            Trở về
+                        </button>
                         <button type="submit" className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700">Lưu</button>
                     </div>
                 </form>
@@ -157,8 +181,8 @@ const ReceiptModal: React.FC<{
                         <p>Cảm ơn quý khách!</p>
                      </div>
                 </div>
-                <div className="bg-slate-50 px-6 py-4 flex justify-end space-x-3 border-t border-slate-200">
-                    <button onClick={onClose} className="bg-slate-200 text-slate-800 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300">Đóng</button>
+                <div className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 flex justify-end space-x-3 border-t border-slate-200 dark:border-slate-700">
+                    <button onClick={onClose} className="bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">Đóng</button>
                     <button onClick={handlePrint} className="flex items-center bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700">
                         <PrinterIcon className="w-5 h-5 mr-2" /> In hóa đơn
                     </button>
@@ -199,10 +223,13 @@ interface Sale {
     notes?: string;
 }
 
+const ITEMS_PER_PAGE = 50;
+
 const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setParts, transactions, setTransactions, cartItems, setCartItems, storeSettings, currentBranchId, customers, setCustomers }) => {
     // Component State
     const [activeTab, setActiveTab] = useState<'products' | 'cart' | 'history'>('products');
     const [searchTerm, setSearchTerm] = useState('');
+    const [productsCurrentPage, setProductsCurrentPage] = useState(1);
     const [isReceiptVisible, setIsReceiptVisible] = useState(false);
     const [lastTransaction, setLastTransaction] = useState<{cart: CartItem[], total: number, subtotal: number, discount: number} | null>(null);
     const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
@@ -228,12 +255,22 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
 
     // --- Memos & Calculations ---
 
+    useEffect(() => {
+        setProductsCurrentPage(1);
+    }, [searchTerm]);
+
     const filteredParts = useMemo(() =>
         parts.filter(part =>
             (part.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             part.sku.toLowerCase().includes(searchTerm.toLowerCase())) &&
             (part.stock[currentBranchId] || 0) > 0
         ), [parts, searchTerm, currentBranchId]);
+
+    const productsTotalPages = Math.ceil(filteredParts.length / ITEMS_PER_PAGE);
+    const paginatedParts = useMemo(() => {
+        const startIndex = (productsCurrentPage - 1) * ITEMS_PER_PAGE;
+        return filteredParts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filteredParts, productsCurrentPage]);
 
     const cartSubtotal = useMemo(() => cartItems.reduce((sum, item) => sum + item.sellingPrice * item.quantity, 0), [cartItems]);
     const cartItemsDiscount = useMemo(() => cartItems.reduce((sum, item) => sum + (item.discount || 0), 0), [cartItems]);
@@ -370,7 +407,6 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
                 customerId: selectedCustomerId || undefined,
                 customerName: selectedCustomer?.name || customerSearch || 'Khách vãng lai',
                 userId: currentUser.id,
-// Fix: Changed currentUser.username to currentUser.name as 'username' does not exist on the User type.
                 userName: currentUser.name,
             };
             newTransactions.push(newTransaction);
@@ -509,7 +545,6 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
                 customerId: selectedCustomerId || undefined,
                 customerName: selectedCustomer?.name || customerSearch || 'Khách vãng lai',
                 userId: currentUser.id,
-// Fix: Changed currentUser.username to currentUser.name as 'username' does not exist on the User type.
                 userName: currentUser.name,
             };
         });
@@ -616,12 +651,12 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
                 />
             )}
             
-            <div className="border-b border-slate-200">
+            <div className="border-b border-slate-200 dark:border-slate-700">
                 <nav className="-mb-px flex space-x-6 sm:space-x-8" aria-label="Tabs">
-                    <button onClick={() => setActiveTab('products')} className={`flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'products' ? 'border-sky-500 text-sky-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>
+                    <button onClick={() => setActiveTab('products')} className={`flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'products' ? 'border-sky-500 text-sky-600 dark:border-sky-400 dark:text-sky-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'}`}>
                         <ArchiveBoxIcon className="w-5 h-5 mr-2"/> Sản phẩm
                     </button>
-                    <button onClick={() => setActiveTab('cart')} className={`flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'cart' ? 'border-sky-500 text-sky-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>
+                    <button onClick={() => setActiveTab('cart')} className={`flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'cart' ? 'border-sky-500 text-sky-600 dark:border-sky-400 dark:text-sky-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'}`}>
                         <ShoppingCartIcon className="w-5 h-5 mr-2"/> Giỏ hàng
                         {totalCartItems > 0 && (
                             <span className="ml-2 bg-sky-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
@@ -629,7 +664,7 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
                             </span>
                         )}
                     </button>
-                    <button onClick={() => setActiveTab('history')} className={`flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'history' ? 'border-sky-500 text-sky-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>
+                    <button onClick={() => setActiveTab('history')} className={`flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'history' ? 'border-sky-500 text-sky-600 dark:border-sky-400 dark:text-sky-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'}`}>
                        <DocumentTextIcon className="w-5 h-5 mr-2"/> Lịch sử
                     </button>
                 </nav>
@@ -637,20 +672,38 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
             
             {activeTab === 'products' && (
                 <div className="relative">
-                    <input type="text" placeholder="Tìm theo tên sản phẩm..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg mb-4 text-slate-900 focus:ring-sky-500 focus:border-sky-500"/>
+                    <input type="text" placeholder="Tìm theo tên sản phẩm..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg mb-4 text-slate-900 dark:text-slate-100 dark:bg-slate-800 focus:ring-sky-500 focus:border-sky-500"/>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                       {filteredParts.map(part => (
+                       {paginatedParts.map(part => (
                            <ProductCard key={part.id} part={part} onSelect={() => handleOpenAddModal(part)} currentBranchId={currentBranchId} />
                        ))}
                     </div>
+                     {filteredParts.length === 0 && (
+                        <div className="text-center py-16 text-slate-500 dark:text-slate-400">
+                            <ArchiveBoxIcon className="w-12 h-12 mx-auto text-slate-400 dark:text-slate-500" />
+                            <p className="mt-4 font-semibold">Không tìm thấy sản phẩm nào</p>
+                            <p>Hãy thử một từ khóa tìm kiếm khác.</p>
+                        </div>
+                    )}
+                    {productsTotalPages > 1 && (
+                        <div className="mt-6">
+                            <Pagination
+                                currentPage={productsCurrentPage}
+                                totalPages={productsTotalPages}
+                                onPageChange={setProductsCurrentPage}
+                                itemsPerPage={ITEMS_PER_PAGE}
+                                totalItems={filteredParts.length}
+                            />
+                        </div>
+                    )}
                     {totalCartItems > 0 && <FloatingCartButton count={totalCartItems} total={cartTotal} onClick={() => setActiveTab('cart')} />}
                 </div>
             )}
             {activeTab === 'cart' && (
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200/60 max-w-4xl mx-auto">
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200/60 dark:border-slate-700 max-w-4xl mx-auto">
                     <div className="space-y-4">
                          <div ref={customerInputRef}>
-                            <label className="block text-sm font-medium text-slate-700">Khách hàng</label>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Khách hàng</label>
                             <div className="relative mt-1">
                                 <div className="flex">
                                     <input 
@@ -663,49 +716,49 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
                                             setSelectedCustomerId(null);
                                         }}
                                         onFocus={() => setIsCustomerListOpen(true)}
-                                        className="w-full p-2 border border-slate-300 rounded-l-md"
+                                        className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-l-md dark:bg-slate-800 dark:text-slate-100"
                                     />
-                                    <button type="button" onClick={() => setIsNewCustomerModalOpen(true)} className="p-2 border-t border-b border-r rounded-r-md h-[42px] bg-slate-50 hover:bg-slate-100" title="Thêm khách hàng mới">
+                                    <button type="button" onClick={() => setIsNewCustomerModalOpen(true)} className="p-2 border-t border-b border-r rounded-r-md h-[42px] bg-slate-50 dark:bg-slate-700 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600" title="Thêm khách hàng mới">
                                         <PlusIcon />
                                     </button>
                                 </div>
                                 {isCustomerListOpen && (
-                                    <div className="absolute z-10 w-full bg-white border rounded-md mt-1 shadow-lg max-h-60 overflow-y-auto">
+                                    <div className="absolute z-10 w-full bg-white dark:bg-slate-800 border dark:border-slate-600 rounded-md mt-1 shadow-lg max-h-60 overflow-y-auto">
                                         {filteredCustomers.length > 0 ? filteredCustomers.map(c => (
-                                            <div key={c.id} onClick={() => handleSelectCustomer(c)} className="p-2 hover:bg-slate-100 cursor-pointer text-sm">
-                                                <p className="font-semibold">{c.name}</p>
-                                                <p className="text-slate-500">{c.phone}</p>
+                                            <div key={c.id} onClick={() => handleSelectCustomer(c)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer text-sm">
+                                                <p className="font-semibold text-slate-800 dark:text-slate-200">{c.name}</p>
+                                                <p className="text-slate-500 dark:text-slate-400">{c.phone}</p>
                                             </div>
                                         )) : (
-                                            <div className="p-2 text-sm text-slate-500">Không tìm thấy khách hàng.</div>
+                                            <div className="p-2 text-sm text-slate-500 dark:text-slate-400">Không tìm thấy khách hàng.</div>
                                         )}
                                     </div>
                                 )}
                             </div>
                          </div>
-                         <h3 className="text-lg font-semibold text-slate-800 pt-2">Giỏ hàng xuất bán</h3>
+                         <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 pt-2">Giỏ hàng xuất bán</h3>
                           {cartItems.length === 0 ? (
-                            <p className="text-slate-500 text-center py-8">Giỏ hàng trống.</p>
+                            <p className="text-slate-500 dark:text-slate-400 text-center py-8">Giỏ hàng trống.</p>
                         ) : (
                             <div className="space-y-3">
                                 {cartItems.map(item => (
-                                    <div key={item.partId} className="bg-slate-50 p-3 rounded-lg border">
+                                    <div key={item.partId} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border dark:border-slate-700">
                                         <div className="flex justify-between items-start">
                                             <div>
-                                                <p className="font-semibold text-slate-800">{item.partName}</p>
-                                                <p className="text-xs text-slate-500">SKU: {item.sku}</p>
+                                                <p className="font-semibold text-slate-800 dark:text-slate-100">{item.partName}</p>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400">SKU: {item.sku}</p>
                                             </div>
                                             <button onClick={() => updateCartQuantity(item.partId, 0)} className="text-red-500 hover:text-red-700 p-1"><TrashIcon className="w-5 h-5"/></button>
                                         </div>
                                         <div className="flex items-center justify-between mt-2">
                                             <div className="flex items-center gap-2">
-                                                <button onClick={() => updateCartQuantity(item.partId, item.quantity - 1)} className="p-1 border rounded-md"><MinusIcon className="w-4 h-4" /></button>
-                                                <input type="number" value={item.quantity} onChange={e => updateCartQuantity(item.partId, parseInt(e.target.value))} className="w-12 text-center border-slate-300 rounded" />
-                                                <button onClick={() => updateCartQuantity(item.partId, item.quantity + 1)} className="p-1 border rounded-md"><PlusIcon className="w-4 h-4" /></button>
+                                                <button onClick={() => updateCartQuantity(item.partId, item.quantity - 1)} className="p-1 border dark:border-slate-600 rounded-md"><MinusIcon className="w-4 h-4"/></button>
+                                                <input type="number" value={item.quantity} onChange={e => updateCartQuantity(item.partId, parseInt(e.target.value))} className="w-12 text-center border-slate-300 dark:bg-slate-700 dark:border-slate-500 dark:text-slate-100 rounded" />
+                                                <button onClick={() => updateCartQuantity(item.partId, item.quantity + 1)} className="p-1 border dark:border-slate-600 rounded-md"><PlusIcon className="w-4 h-4"/></button>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-sm text-slate-600">{formatCurrency(item.sellingPrice)}</p>
-                                                <p className="font-semibold text-slate-900">{formatCurrency(item.sellingPrice * item.quantity)}</p>
+                                                <p className="text-sm text-slate-600 dark:text-slate-400">{formatCurrency(item.sellingPrice)}</p>
+                                                <p className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(item.sellingPrice * item.quantity)}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -713,36 +766,36 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
                             </div>
                         )}
                          
-                         <div className="border-t pt-4 space-y-2">
-                             <div className="flex justify-between items-center"><span className="text-slate-600">Tổng tiền hàng</span> <span className="font-medium">{formatCurrency(cartSubtotal)}</span></div>
+                         <div className="border-t dark:border-slate-700 pt-4 space-y-2 text-slate-800 dark:text-slate-200">
+                             <div className="flex justify-between items-center"><span className="text-slate-600 dark:text-slate-400">Tổng tiền hàng</span> <span className="font-medium">{formatCurrency(cartSubtotal)}</span></div>
                               <div className="flex justify-between items-center">
-                                <span className="text-slate-600">Giảm giá</span> 
-                                <input type="number" value={orderDiscount || ''} onChange={e => setOrderDiscount(Number(e.target.value))} placeholder="0" className="w-28 p-1 border rounded-md text-right"/>
+                                <span className="text-slate-600 dark:text-slate-400">Giảm giá</span> 
+                                <input type="number" value={orderDiscount || ''} onChange={e => setOrderDiscount(Number(e.target.value))} placeholder="0" className="w-28 p-1 border dark:border-slate-600 rounded-md text-right dark:bg-slate-800 dark:text-slate-100"/>
                              </div>
                               <div className="flex justify-between items-center font-bold text-xl"><span >Khách phải trả</span> <span>{formatCurrency(cartTotal)}</span></div>
                               <div className="flex justify-between items-center">
-                                <span className="text-slate-600">Khách thanh toán</span> 
-                                <input type="number" value={amountPaid || ''} onChange={e => setAmountPaid(Number(e.target.value))} placeholder="0" className="w-28 p-1 border rounded-md text-right"/>
+                                <span className="text-slate-600 dark:text-slate-400">Khách thanh toán</span> 
+                                <input type="number" value={amountPaid || ''} onChange={e => setAmountPaid(Number(e.target.value))} placeholder="0" className="w-28 p-1 border dark:border-slate-600 rounded-md text-right dark:bg-slate-800 dark:text-slate-100"/>
                              </div>
                              <div className="flex flex-wrap gap-2 pt-2">
                                {[cartTotal, 200000, 500000, 1000000].map(val => (
-                                   <button key={val} onClick={() => setAmountPaid(val)} className="border rounded-full px-3 py-1 text-sm hover:bg-slate-100">{formatCurrency(val)}</button>
+                                   <button key={val} onClick={() => setAmountPaid(val)} className="border dark:border-slate-600 rounded-full px-3 py-1 text-sm hover:bg-slate-100 dark:hover:bg-slate-700">{formatCurrency(val)}</button>
                                ))}
                              </div>
                          </div>
 
-                          <div className="border-t pt-4 space-y-3">
+                          <div className="border-t dark:border-slate-700 pt-4 space-y-3">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700">Thời gian bán hàng</label>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Thời gian bán hàng</label>
                                 <div className="flex items-center gap-4 mt-1">
                                     <label className="flex items-center"><input type="radio" name="saleTime" checked={useCurrentTime} onChange={() => setUseCurrentTime(true)} className="mr-1"/> Thời gian hiện tại</label>
                                     <label className="flex items-center"><input type="radio" name="saleTime" checked={!useCurrentTime} onChange={() => setUseCurrentTime(false)} className="mr-1"/> Tùy chỉnh</label>
                                 </div>
-                                {!useCurrentTime && <input type="datetime-local" value={customSaleTime} onChange={e => setCustomSaleTime(e.target.value)} className="mt-2 p-2 border rounded-md w-full sm:w-auto"/>}
+                                {!useCurrentTime && <input type="datetime-local" value={customSaleTime} onChange={e => setCustomSaleTime(e.target.value)} className="mt-2 p-2 border dark:border-slate-600 rounded-md w-full sm:w-auto dark:bg-slate-800 dark:text-slate-100"/>}
                             </div>
                             <div>
                                 <label className="flex items-center"><input type="checkbox" checked={showSaleNote} onChange={e => setShowSaleNote(e.target.checked)} className="mr-2"/> Ghi chú riêng cho đơn hàng</label>
-                                {showSaleNote && <textarea value={saleNote} onChange={e => setSaleNote(e.target.value)} className="mt-2 p-2 border rounded-md w-full" rows={2}></textarea>}
+                                {showSaleNote && <textarea value={saleNote} onChange={e => setSaleNote(e.target.value)} className="mt-2 p-2 border dark:border-slate-600 rounded-md w-full dark:bg-slate-800 dark:text-slate-100" rows={2}></textarea>}
                             </div>
                              <label className="flex items-center"><input type="checkbox" checked={printReceipt} onChange={e => setPrintReceipt(e.target.checked)} className="mr-2"/> Đồng thời in hoá đơn</label>
                           </div>
@@ -750,12 +803,12 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
                           <div className="flex gap-4 pt-4">
                                 {editingSaleId ? (
                                     <>
-                                        <button onClick={handleCancelEdit} className="w-full bg-slate-100 border border-slate-300 text-slate-800 font-bold py-3 rounded-lg hover:bg-slate-200">HỦY</button>
+                                        <button onClick={handleCancelEdit} className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-500 text-slate-800 dark:text-slate-200 font-bold py-3 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600">HỦY</button>
                                         <button onClick={handleUpdateSale} className="w-full bg-sky-600 text-white font-bold py-3 rounded-lg hover:bg-sky-700 disabled:bg-sky-300">CẬP NHẬT</button>
                                     </>
                                 ) : (
                                     <>
-                                        <button className="w-full bg-slate-100 border border-slate-300 text-slate-800 font-bold py-3 rounded-lg hover:bg-slate-200">LƯU NHÁP</button>
+                                        <button className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-500 text-slate-800 dark:text-slate-200 font-bold py-3 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600">LƯU NHÁP</button>
                                         <button onClick={handleCheckout} disabled={cartItems.length === 0} className="w-full bg-orange-500 text-white font-bold py-3 rounded-lg hover:bg-orange-600 disabled:bg-orange-300">XUẤT BÁN</button>
                                     </>
                                 )}
@@ -764,38 +817,38 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
                 </div>
             )}
              {activeTab === 'history' && (
-                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200/60 max-w-5xl mx-auto">
-                    <h2 className="text-2xl font-bold mb-4 flex items-center text-slate-800"><DocumentTextIcon className="w-6 h-6 mr-2"/> Lịch sử bán lẻ</h2>
+                 <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200/60 dark:border-slate-700 max-w-5xl mx-auto">
+                    <h2 className="text-2xl font-bold mb-4 flex items-center text-slate-800 dark:text-slate-100"><DocumentTextIcon className="w-6 h-6 mr-2"/> Lịch sử bán lẻ</h2>
                     <div className="space-y-3 max-h-[70vh] overflow-y-auto">
                        {salesHistory.length === 0 ? (
-                            <p className="text-center text-slate-500 py-8">Chưa có giao dịch bán lẻ nào.</p>
+                            <p className="text-center text-slate-500 dark:text-slate-400 py-8">Chưa có giao dịch bán lẻ nào.</p>
                        ) : (
                         salesHistory.map(sale => (
-                            <div key={sale.id} className="rounded-lg border border-slate-200 overflow-hidden">
-                                <div className="w-full flex justify-between items-center p-4 bg-slate-50 hover:bg-slate-100/70">
+                            <div key={sale.id} className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                                <div className="w-full flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100/70 dark:hover:bg-slate-700/70">
                                     <div 
                                         className="flex-grow flex items-center cursor-pointer" 
                                         onClick={() => setExpandedSaleId(prev => prev === sale.id ? null : sale.id)}
                                     >
                                         <div className="flex-grow text-left">
-                                            <p className="font-semibold text-sky-700">{sale.id}</p>
-                                            <p className="font-semibold text-slate-800">{sale.customerName}</p>
-                                            <p className="text-sm text-slate-600">{new Date(sale.date).toLocaleString('vi-VN')}</p>
+                                            <p className="font-semibold text-sky-700 dark:text-sky-400">{sale.id}</p>
+                                            <p className="font-semibold text-slate-800 dark:text-slate-100">{sale.customerName}</p>
+                                            <p className="text-sm text-slate-600 dark:text-slate-400">{new Date(sale.date).toLocaleString('vi-VN')}</p>
                                         </div>
                                         <div className="text-right pr-4 flex-shrink-0">
                                             {sale.totalDiscount > 0 && (
-                                                <p className="text-sm text-slate-500 line-through">
+                                                <p className="text-sm text-slate-500 dark:text-slate-500 line-through">
                                                     {(sale.total + sale.totalDiscount).toLocaleString('vi-VN')} ₫
                                                 </p>
                                             )}
-                                            <p className="font-bold text-slate-800 text-lg">
+                                            <p className="font-bold text-slate-800 dark:text-slate-100 text-lg">
                                                 {sale.total.toLocaleString('vi-VN')} ₫
                                             </p>
                                         </div>
-                                        <ChevronDownIcon className={`w-5 h-5 transition-transform text-slate-500 ${expandedSaleId === sale.id ? 'rotate-180' : ''}`} />
+                                        <ChevronDownIcon className={`w-5 h-5 transition-transform text-slate-500 dark:text-slate-400 ${expandedSaleId === sale.id ? 'rotate-180' : ''}`} />
                                     </div>
-                                    <div className="flex items-center gap-2 pl-4 ml-4 border-l border-slate-300">
-                                        <button onClick={() => handleEditSale(sale.id)} className="p-2 text-sky-600 hover:text-sky-800" title="Chỉnh sửa">
+                                    <div className="flex items-center gap-2 pl-4 ml-4 border-l border-slate-300 dark:border-slate-600">
+                                        <button onClick={() => handleEditSale(sale.id)} className="p-2 text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300" title="Chỉnh sửa">
                                             <PencilSquareIcon className="w-5 h-5" />
                                         </button>
                                         <button onClick={() => handleDeleteSale(sale.id)} className="p-2 text-red-500 hover:text-red-700" title="Xóa">
@@ -804,22 +857,22 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
                                     </div>
                                 </div>
                                 {expandedSaleId === sale.id && (
-                                    <div className="p-4 border-t border-slate-200 bg-white">
+                                    <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50">
                                         <div className="mb-3 text-sm space-y-1">
-                                            <p><span className="font-semibold text-slate-600">Nhân viên:</span> {sale.userName}</p>
-                                            {sale.notes && sale.notes !== 'Bán lẻ tại quầy' && <p><span className="font-semibold text-slate-600">Ghi chú:</span> {sale.notes}</p>}
+                                            <p><span className="font-semibold text-slate-600 dark:text-slate-400">Nhân viên:</span> <span className="dark:text-slate-200">{sale.userName}</span></p>
+                                            {sale.notes && sale.notes !== 'Bán lẻ tại quầy' && <p><span className="font-semibold text-slate-600 dark:text-slate-400">Ghi chú:</span> <span className="dark:text-slate-200">{sale.notes}</span></p>}
                                         </div>
                                         <table className="w-full text-sm">
                                             <thead>
-                                                <tr className="border-b">
-                                                    <th className="text-left font-semibold text-slate-600 pb-2">Sản phẩm</th>
-                                                    <th className="text-center font-semibold text-slate-600 pb-2">SL</th>
-                                                    <th className="text-right font-semibold text-slate-600 pb-2">Thành tiền</th>
+                                                <tr className="border-b dark:border-slate-600">
+                                                    <th className="text-left font-semibold text-slate-600 dark:text-slate-400 pb-2">Sản phẩm</th>
+                                                    <th className="text-center font-semibold text-slate-600 dark:text-slate-400 pb-2">SL</th>
+                                                    <th className="text-right font-semibold text-slate-600 dark:text-slate-400 pb-2">Thành tiền</th>
                                                 </tr>
                                             </thead>
-                                            <tbody>
+                                            <tbody className="dark:text-slate-200">
                                                 {sale.items.map((item, index) => (
-                                                    <tr key={index} className="border-b last:border-none">
+                                                    <tr key={index} className="border-b dark:border-slate-700 last:border-none">
                                                         <td className="py-2">{item.partName}</td>
                                                         <td className="py-2 text-center">{item.quantity}</td>
                                                         <td className="py-2 text-right">{item.totalPrice.toLocaleString('vi-VN')} ₫</td>
@@ -827,10 +880,10 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
                                                 ))}
                                             </tbody>
                                         </table>
-                                        <div className="mt-2 text-right text-sm space-y-1">
+                                        <div className="mt-2 text-right text-sm space-y-1 dark:text-slate-300">
                                             <p>Tạm tính: <span className="font-medium">{(sale.total + sale.totalDiscount).toLocaleString('vi-VN')} ₫</span></p>
-                                            {sale.totalDiscount > 0 && <p className="text-red-600">Giảm giá: <span className="font-medium">-{sale.totalDiscount.toLocaleString('vi-VN')} ₫</span></p>}
-                                            <p className="font-bold">Tổng cộng: {sale.total.toLocaleString('vi-VN')} ₫</p>
+                                            {sale.totalDiscount > 0 && <p className="text-red-600 dark:text-red-400">Giảm giá: <span className="font-medium">-{sale.totalDiscount.toLocaleString('vi-VN')} ₫</span></p>}
+                                            <p className="font-bold dark:text-slate-100">Tổng cộng: {sale.total.toLocaleString('vi-VN')} ₫</p>
                                         </div>
                                     </div>
                                 )}
@@ -847,15 +900,15 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
 // --- Sub-components ---
 
 const ProductCard: React.FC<{ part: Part; onSelect: () => void; currentBranchId: string }> = ({ part, onSelect, currentBranchId }) => (
-    <div onClick={onSelect} className="border rounded-lg p-3 flex flex-col cursor-pointer hover:shadow-md hover:border-sky-500 transition-all bg-white">
-        <div className="relative w-full h-24 bg-slate-100 rounded-md flex items-center justify-center mb-2">
-            <ArchiveBoxIcon className="w-10 h-10 text-slate-400" />
+    <div onClick={onSelect} className="border dark:border-slate-700 rounded-lg p-3 flex flex-col cursor-pointer hover:shadow-md hover:border-sky-500 dark:hover:border-sky-500 transition-all bg-white dark:bg-slate-800">
+        <div className="relative w-full h-24 bg-slate-100 dark:bg-slate-700 rounded-md flex items-center justify-center mb-2">
+            <ArchiveBoxIcon className="w-10 h-10 text-slate-400 dark:text-slate-500" />
         </div>
-        <p className="font-semibold text-sm text-slate-800 flex-grow leading-tight">{part.name}</p>
-        <p className="text-xs text-slate-500 mt-1">SKU: {part.sku}</p>
+        <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 flex-grow leading-tight">{part.name}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">SKU: {part.sku}</p>
         <div className="flex justify-between items-center mt-2">
-            <p className="font-bold text-sky-600">{formatCurrency(part.sellingPrice)}</p>
-            <p className="text-sm text-slate-600">Kho: {part.stock[currentBranchId] || 0}</p>
+            <p className="font-bold text-sky-600 dark:text-sky-400">{formatCurrency(part.sellingPrice)}</p>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Kho: {part.stock[currentBranchId] || 0}</p>
         </div>
     </div>
 );
@@ -900,36 +953,36 @@ const AddToCartModal: React.FC<{ part: Part; onClose: () => void; onConfirm: (it
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex justify-center items-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-                <div className="p-4 border-b flex justify-between items-center">
-                    <h3 className="text-lg font-bold text-slate-800">{part.name}</h3>
-                    <button onClick={onClose}><XMarkIcon className="w-6 h-6 text-slate-500" /></button>
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-md">
+                <div className="p-4 border-b dark:border-slate-700 flex justify-between items-center">
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{part.name}</h3>
+                    <button onClick={onClose}><XMarkIcon className="w-6 h-6 text-slate-500 dark:text-slate-400" /></button>
                 </div>
                 <div className="p-4 space-y-4">
-                    <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-md text-sm">
+                    <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700/50 p-3 rounded-md text-sm text-slate-800 dark:text-slate-200">
                         <p><strong>SKU:</strong> {part.sku}</p>
                         <p><strong>Giá bán lẻ:</strong> {formatCurrency(part.sellingPrice)}</p>
                         <p><strong>Có thể bán:</strong> {part.stock[part.id] || 5} (Mock)</p>
                     </div>
                     <div className="flex items-center justify-between">
-                         <label className="font-medium text-slate-700">Số lượng:</label>
+                         <label className="font-medium text-slate-700 dark:text-slate-300">Số lượng:</label>
                         <div className="flex items-center gap-2">
-                           <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="p-1 border rounded-md"><MinusIcon className="w-5 h-5"/></button>
-                           <input type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} className="w-16 text-center border-slate-300 rounded" />
-                           <button onClick={() => setQuantity(q => q + 1)} className="p-1 border rounded-md"><PlusIcon className="w-5 h-5"/></button>
+                           <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="p-1 border dark:border-slate-600 rounded-md"><MinusIcon className="w-5 h-5"/></button>
+                           <input type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} className="w-16 text-center border-slate-300 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100 rounded" />
+                           <button onClick={() => setQuantity(q => q + 1)} className="p-1 border dark:border-slate-600 rounded-md"><PlusIcon className="w-5 h-5"/></button>
                         </div>
                     </div>
-                    {part.warrantyPeriod && <p className="flex items-center text-sm text-slate-600"><ClockIcon className="w-4 h-4 mr-1 text-green-600" /> Bảo hành: {part.warrantyPeriod}</p>}
+                    {part.warrantyPeriod && <p className="flex items-center text-sm text-slate-600 dark:text-slate-300"><ClockIcon className="w-4 h-4 mr-1 text-green-600 dark:text-green-400" /> Bảo hành: {part.warrantyPeriod}</p>}
                     <div className="flex justify-between items-center relative">
-                        <span className="font-medium text-slate-700">Giá bán:</span>
+                        <span className="font-medium text-slate-700 dark:text-slate-300">Giá bán:</span>
                         <div className="flex items-center gap-2">
-                             <span className="font-bold text-lg text-slate-900">{formatCurrency(price * quantity)}</span>
-                            <button onClick={() => setIsEditingPrice(true)} className="p-1 text-sky-600"><PencilSquareIcon className="w-5 h-5"/></button>
+                             <span className="font-bold text-lg text-slate-900 dark:text-slate-100">{formatCurrency(price * quantity)}</span>
+                            <button onClick={() => setIsEditingPrice(true)} className="p-1 text-sky-600 dark:text-sky-400"><PencilSquareIcon className="w-5 h-5"/></button>
                         </div>
                         {isEditingPrice && <PriceDiscountPopover basePrice={part.sellingPrice} currentPrice={price} onApply={setPrice} onClose={() => setIsEditingPrice(false)} ref={popoverRef} />}
                     </div>
                 </div>
-                 <div className="p-4 bg-slate-50 flex gap-4">
+                 <div className="p-4 bg-slate-50 dark:bg-slate-800 flex gap-4">
                     <button onClick={() => handleConfirm(true)} className="w-full bg-orange-500 text-white font-bold py-3 rounded-lg hover:bg-orange-600">Thêm vào giỏ hàng</button>
                     <button onClick={() => handleConfirm(false)} className="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700">Thêm và tiếp tục</button>
                 </div>
@@ -963,17 +1016,17 @@ const PriceDiscountPopover = React.forwardRef<HTMLDivElement, { basePrice: numbe
     };
 
     return (
-        <div ref={ref} className="absolute right-0 top-full mt-2 w-64 bg-white border rounded-lg shadow-xl z-20 p-4 space-y-3">
+        <div ref={ref} className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 border dark:border-slate-600 rounded-lg shadow-xl z-20 p-4 space-y-3">
             <div>
-                <label className="text-sm font-medium">Đơn giá:</label>
-                <input type="text" value={formatCurrency(basePrice)} disabled className="w-full p-2 bg-slate-100 border rounded-md mt-1" />
+                <label className="text-sm font-medium dark:text-slate-300">Đơn giá:</label>
+                <input type="text" value={formatCurrency(basePrice)} disabled className="w-full p-2 bg-slate-100 dark:bg-slate-700 border dark:border-slate-600 rounded-md mt-1" />
             </div>
              <div>
-                <label className="text-sm font-medium">Giảm giá:</label>
+                <label className="text-sm font-medium dark:text-slate-300">Giảm giá:</label>
                 <div className="flex items-center mt-1">
-                    <input type="number" value={discountValue || ''} onChange={e => setDiscountValue(Number(e.target.value))} className="w-full p-2 border rounded-l-md" />
-                    <button onClick={() => setDiscountType('VND')} className={`p-2 border-t border-b ${discountType === 'VND' ? 'bg-sky-600 text-white' : ''}`}>VND</button>
-                    <button onClick={() => setDiscountType('%')} className={`p-2 border rounded-r-md ${discountType === '%' ? 'bg-sky-600 text-white' : ''}`}>%</button>
+                    <input type="number" value={discountValue || ''} onChange={e => setDiscountValue(Number(e.target.value))} className="w-full p-2 border dark:border-slate-500 rounded-l-md dark:bg-slate-700" />
+                    <button onClick={() => setDiscountType('VND')} className={`p-2 border-t border-b dark:border-slate-500 ${discountType === 'VND' ? 'bg-sky-600 text-white' : 'dark:text-slate-200'}`}>VND</button>
+                    <button onClick={() => setDiscountType('%')} className={`p-2 border dark:border-slate-500 rounded-r-md ${discountType === '%' ? 'bg-sky-600 text-white' : 'dark:text-slate-200'}`}>%</button>
                 </div>
             </div>
             <button onClick={handleApplyDiscount} className="w-full bg-sky-600 text-white font-semibold py-2 rounded-md">Áp dụng</button>

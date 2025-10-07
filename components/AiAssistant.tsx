@@ -108,12 +108,12 @@ const AiAssistant: React.FC = () => {
     }
 
     return sections.map((section, index) => (
-        <details key={index} open className="mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden last:mb-0">
-            <summary className="font-semibold text-slate-800 dark:text-slate-200 p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 flex justify-between items-center">
+        <details key={index} open className="mb-4 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden last:mb-0">
+            <summary className="font-semibold text-slate-800 dark:text-slate-100 p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-600 flex justify-between items-center">
                 {section.title}
                 <svg className="w-5 h-5 transition-transform transform details-arrow" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
             </summary>
-            <div className="p-4 border-t border-slate-200 dark:border-slate-700 prose prose-slate dark:prose-invert max-w-none">
+            <div className="p-4 border-t border-slate-200 dark:border-slate-600 prose prose-slate dark:prose-invert max-w-none">
                 <ul className="list-disc pl-5 space-y-1">
                     {section.content.map((item, idx) => (
                         <li key={idx}>{item.replace(/^\* /, '')}</li>
@@ -200,7 +200,7 @@ const AiAssistant: React.FC = () => {
       </div>
 
       {response && !isLoading && (
-        <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-xl border border-slate-200/60 dark:border-slate-700">
+        <div className="bg-slate-50 dark:bg-slate-800 p-6 rounded-xl border border-slate-200/60 dark:border-slate-700">
             <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-100 mb-4">Kết quả Chẩn đoán</h2>
             <div>
                 {parseAndFormatResponse(response)}

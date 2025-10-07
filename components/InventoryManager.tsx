@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import type { Part, InventoryTransaction, User, StoreSettings } from '../types';
-import { PlusIcon, PencilSquareIcon, ArchiveBoxIcon, DocumentTextIcon, MinusIcon, TrashIcon, EllipsisVerticalIcon, ExclamationTriangleIcon, Cog6ToothIcon, ArrowsRightLeftIcon, BanknotesIcon, ChevronDownIcon, CloudArrowUpIcon } from './common/Icons';
+import { PlusIcon, PencilSquareIcon, ArchiveBoxIcon, DocumentTextIcon, MinusIcon, TrashIcon, EllipsisVerticalIcon, ExclamationTriangleIcon, Cog6ToothIcon, ArrowsRightLeftIcon, BanknotesIcon, ChevronDownIcon, CloudArrowUpIcon, ArrowUturnLeftIcon } from './common/Icons';
+import Pagination from './common/Pagination';
 
 // Helper to format currency
 const formatCurrency = (amount: number) => {
@@ -146,6 +147,8 @@ const hondaPartsData: (Omit<Part, 'id' | 'stock'> & { model: string[] })[] = [
     { name: 'Vít 4x20', sku: '93891-040-2007', price: 3000, sellingPrice: 4628, category: 'Linh kiện nhỏ', model: ['Future 125', 'Wave Alpha', 'Dream'] },
 ];
 
+const ITEMS_PER_PAGE = 50;
+
 
 // --- Modals ---
 const PartModal: React.FC<{
@@ -280,35 +283,35 @@ const PartModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg">
                 <form onSubmit={(e) => e.preventDefault()}>
                     <div className="p-6">
-                        <h2 className="text-2xl font-bold text-gray-800 mb-6">{part?.id ? 'Chỉnh sửa Phụ tùng' : 'Thêm Phụ tùng mới'}</h2>
+                        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6">{part?.id ? 'Chỉnh sửa Phụ tùng' : 'Thêm Phụ tùng mới'}</h2>
                         <div className="space-y-4">
                             <div>
-                                <label htmlFor="part-name" className="block text-sm font-medium text-gray-700">Tên phụ tùng</label>
-                                <input id="part-name" type="text" name="name" value={formData.name} onChange={handleChange} placeholder="VD: Bugi NGK Iridium" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900" required />
+                                <label htmlFor="part-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Tên phụ tùng</label>
+                                <input id="part-name" type="text" name="name" value={formData.name} onChange={handleChange} placeholder="VD: Bugi NGK Iridium" className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" required />
                             </div>
                             <div>
-                                <label htmlFor="part-sku" className="block text-sm font-medium text-gray-700">SKU</label>
-                                <input id="part-sku" type="text" name="sku" value={formData.sku} onChange={handleChange} placeholder="Tự động tạo hoặc nhập thủ công" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900" required />
+                                <label htmlFor="part-sku" className="block text-sm font-medium text-slate-700 dark:text-slate-300">SKU</label>
+                                <input id="part-sku" type="text" name="sku" value={formData.sku} onChange={handleChange} placeholder="Tự động tạo hoặc nhập thủ công" className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" required />
                             </div>
                              <div>
-                                <label className="block text-sm font-medium text-gray-700">Danh mục sản phẩm</label>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Danh mục sản phẩm</label>
                                 <div className="flex items-center space-x-2 mt-1">
                                     <select
                                         name="category"
                                         value={formData.category || ''}
                                         onChange={handleChange}
-                                        className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                                        className="block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100"
                                     >
                                         <option value="">-- Chọn danh mục --</option>
                                         {allCategories.map(cat => (
                                             <option key={cat} value={cat}>{cat}</option>
                                         ))}
                                     </select>
-                                    <button type="button" onClick={() => setIsAddingNewCategory(!isAddingNewCategory)} className="p-2 bg-gray-200 rounded-md hover:bg-gray-300 flex-shrink-0">
-                                        <PlusIcon className="w-5 h-5 text-gray-700" />
+                                    <button type="button" onClick={() => setIsAddingNewCategory(!isAddingNewCategory)} className="p-2 bg-slate-200 dark:bg-slate-700 rounded-md hover:bg-slate-300 dark:hover:bg-slate-600 flex-shrink-0">
+                                        <PlusIcon className="w-5 h-5 text-slate-700 dark:text-slate-200" />
                                     </button>
                                 </div>
                                 {isAddingNewCategory && (
@@ -318,46 +321,47 @@ const PartModal: React.FC<{
                                             value={newCategoryName}
                                             onChange={e => setNewCategoryName(e.target.value)}
                                             placeholder="Tên danh mục mới..."
-                                            className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                                            className="block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100"
                                             autoFocus
                                         />
-                                        <button type="button" onClick={handleAddNewCategory} className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700">Lưu</button>
+                                        <button type="button" onClick={handleAddNewCategory} className="px-4 py-2 bg-sky-600 text-white rounded-md text-sm font-medium hover:bg-sky-700">Lưu</button>
                                     </div>
                                 )}
                             </div>
                             <div>
-                                <label htmlFor="part-quantity" className="block text-sm font-medium text-gray-700">Số lượng tồn kho (Chi nhánh hiện tại)</label>
-                                <input id="part-quantity" type="number" name="quantity" value={currentStock} onChange={handleChange} placeholder="0" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900" required />
+                                <label htmlFor="part-quantity" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Số lượng tồn kho (Chi nhánh hiện tại)</label>
+                                <input id="part-quantity" type="number" name="quantity" value={currentStock} onChange={handleChange} placeholder="0" className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" required />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label htmlFor="part-price" className="block text-sm font-medium text-gray-700">Giá nhập</label>
-                                    <input id="part-price" type="number" name="price" value={formData.price} onChange={handleChange} placeholder="80000" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900" required />
+                                    <label htmlFor="part-price" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Giá nhập</label>
+                                    <input id="part-price" type="number" name="price" value={formData.price} onChange={handleChange} placeholder="80000" className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" required />
                                 </div>
                                 <div>
-                                    <label htmlFor="part-sellingPrice" className="block text-sm font-medium text-gray-700">Giá bán</label>
-                                    <input id="part-sellingPrice" type="number" name="sellingPrice" value={formData.sellingPrice} onChange={handleChange} placeholder="110000" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900" required />
+                                    <label htmlFor="part-sellingPrice" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Giá bán</label>
+                                    <input id="part-sellingPrice" type="number" name="sellingPrice" value={formData.sellingPrice} onChange={handleChange} placeholder="110000" className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" required />
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div className="bg-gray-50 px-6 py-3 flex justify-end space-x-3">
-                        <button type="button" onClick={onClose} className="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">
-                            Hủy bỏ
+                    <div className="bg-slate-50 dark:bg-slate-800 px-6 py-3 flex justify-end space-x-3 border-t dark:border-slate-700">
+                        <button type="button" onClick={onClose} className="flex items-center gap-2 bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">
+                            <ArrowUturnLeftIcon className="w-5 h-5" />
+                            Trở về
                         </button>
                         {part?.id ? (
                             <>
                                 <button
                                     type="button"
                                     onClick={handleJustSave}
-                                    className="bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-700"
+                                    className="bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-slate-700"
                                 >
                                     Lưu thay đổi
                                 </button>
                                 <button
                                     type="button"
                                     onClick={handleSaveAndClose}
-                                    className="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700"
+                                    className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700"
                                 >
                                     Lưu & Đóng
                                 </button>
@@ -366,7 +370,7 @@ const PartModal: React.FC<{
                              <button
                                 type="button"
                                 onClick={handleSaveAndClose}
-                                className="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700"
+                                className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700"
                             >
                                 Lưu Phụ tùng
                             </button>
@@ -425,19 +429,19 @@ const TransactionModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg">
                 <div className="p-6">
-                    <h2 className="text-2xl font-bold text-gray-800 mb-6">{type === 'Nhập kho' ? 'Tạo Phiếu Nhập Kho' : 'Tạo Phiếu Xuất Kho'}</h2>
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6">{type === 'Nhập kho' ? 'Tạo Phiếu Nhập Kho' : 'Tạo Phiếu Xuất Kho'}</h2>
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Phụ tùng</label>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Phụ tùng</label>
                             <select value={partId} onChange={e => {
                                 setPartId(e.target.value);
                                 const selected = parts.find(p => p.id === e.target.value);
                                 if (type === 'Nhập kho' && selected) {
                                     setUnitPrice(selected.price);
                                 }
-                            }} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                            }} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100">
                                 <option value="">-- Chọn phụ tùng --</option>
                                 {parts.map(p => (
                                     <option key={p.id} value={p.id}>{p.name} ({p.sku}) - Tồn: {p.stock[currentBranchId] || 0}</option>
@@ -445,25 +449,28 @@ const TransactionModal: React.FC<{
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Số lượng</label>
-                            <input type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} min="1" max={type === 'Xuất kho' ? maxQuantity : undefined} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900" />
-                            {type === 'Xuất kho' && <p className="text-xs text-gray-500 mt-1">Tồn kho hiện tại: {maxQuantity}</p>}
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Số lượng</label>
+                            <input type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} min="1" max={type === 'Xuất kho' ? maxQuantity : undefined} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
+                            {type === 'Xuất kho' && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Tồn kho hiện tại: {maxQuantity}</p>}
                         </div>
                         {type === 'Nhập kho' && (
                              <div>
-                                <label className="block text-sm font-medium text-gray-700">Đơn giá nhập</label>
-                                <input type="number" value={unitPrice ?? ''} onChange={e => setUnitPrice(Number(e.target.value))} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900" />
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Đơn giá nhập</label>
+                                <input type="number" value={unitPrice ?? ''} onChange={e => setUnitPrice(Number(e.target.value))} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
                             </div>
                         )}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Ghi chú</label>
-                            <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="VD: Nhập hàng từ nhà cung cấp A" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"/>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Ghi chú</label>
+                            <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="VD: Nhập hàng từ nhà cung cấp A" className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100"/>
                         </div>
                     </div>
                 </div>
-                <div className="bg-gray-50 px-6 py-3 flex justify-end space-x-3">
-                    <button type="button" onClick={onClose} className="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">Hủy</button>
-                    <button type="button" onClick={handleSubmit} className="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700">Lưu</button>
+                <div className="bg-slate-50 dark:bg-slate-800 px-6 py-3 flex justify-end space-x-3 border-t dark:border-slate-700">
+                    <button type="button" onClick={onClose} className="flex items-center gap-2 bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">
+                        <ArrowUturnLeftIcon className="w-5 h-5" />
+                        Trở về
+                    </button>
+                    <button type="button" onClick={handleSubmit} className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-sky-700">Lưu</button>
                 </div>
             </div>
         </div>
@@ -486,44 +493,44 @@ const HistoryModal: React.FC<{
     
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-                <div className="p-6 border-b">
-                    <h2 className="text-2xl font-bold text-gray-800">Lịch sử giao dịch: {part.name}</h2>
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+                <div className="p-6 border-b dark:border-slate-700">
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Lịch sử giao dịch: {part.name}</h2>
                 </div>
                 <div className="p-6 overflow-y-auto">
                     {partTransactions.length === 0 ? (
-                        <p className="text-gray-500">Không có giao dịch nào cho phụ tùng này.</p>
+                        <p className="text-slate-500 dark:text-slate-400">Không có giao dịch nào cho phụ tùng này.</p>
                     ) : (
                     <table className="w-full text-left">
-                        <thead className="sticky top-0 bg-gray-50 z-10">
+                        <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800 z-10">
                             <tr>
-                                <th className="p-2 font-semibold">Ngày</th>
-                                <th className="p-2 font-semibold">Loại</th>
-                                <th className="p-2 font-semibold">Số lượng</th>
-                                <th className="p-2 font-semibold">Chi nhánh</th>
-                                <th className="p-2 font-semibold">Ghi chú</th>
+                                <th className="p-2 font-semibold text-slate-700 dark:text-slate-300">Ngày</th>
+                                <th className="p-2 font-semibold text-slate-700 dark:text-slate-300">Loại</th>
+                                <th className="p-2 font-semibold text-slate-700 dark:text-slate-300">Số lượng</th>
+                                <th className="p-2 font-semibold text-slate-700 dark:text-slate-300">Chi nhánh</th>
+                                <th className="p-2 font-semibold text-slate-700 dark:text-slate-300">Ghi chú</th>
                             </tr>
                         </thead>
                         <tbody>
                             {partTransactions.map(tx => (
-                                <tr key={tx.id} className="border-b">
-                                    <td className="p-2">{tx.date}</td>
+                                <tr key={tx.id} className="border-b dark:border-slate-700">
+                                    <td className="p-2 text-slate-800 dark:text-slate-200">{tx.date}</td>
                                     <td className="p-2">
-                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${tx.type === 'Nhập kho' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${tx.type === 'Nhập kho' ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'}`}>
                                             {tx.type}
                                         </span>
                                     </td>
-                                    <td className="p-2 font-medium">{tx.quantity}</td>
-                                    <td className="p-2">{storeSettings.branches.find(b => b.id === tx.branchId)?.name || tx.branchId}</td>
-                                    <td className="p-2 text-sm text-gray-600">{tx.notes}</td>
+                                    <td className="p-2 font-medium text-slate-800 dark:text-slate-200">{tx.quantity}</td>
+                                    <td className="p-2 text-slate-800 dark:text-slate-200">{storeSettings.branches.find(b => b.id === tx.branchId)?.name || tx.branchId}</td>
+                                    <td className="p-2 text-sm text-slate-600 dark:text-slate-400">{tx.notes}</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                     )}
                 </div>
-                 <div className="bg-gray-50 px-6 py-3 mt-auto">
-                    <button type="button" onClick={onClose} className="w-full bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">
+                 <div className="bg-slate-50 dark:bg-slate-800 px-6 py-3 mt-auto border-t dark:border-slate-700">
+                    <button type="button" onClick={onClose} className="w-full bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">
                         Đóng
                     </button>
                 </div>
@@ -569,13 +576,13 @@ const TransferStockModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg">
                  <div className="p-6">
-                    <h2 className="text-2xl font-bold text-gray-800 mb-6">Tạo Phiếu Chuyển Kho</h2>
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6">Tạo Phiếu Chuyển Kho</h2>
                     <div className="space-y-4">
                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Phụ tùng</label>
-                            <select value={partId} onChange={e => setPartId(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Phụ tùng</label>
+                            <select value={partId} onChange={e => setPartId(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100">
                                 <option value="">-- Chọn phụ tùng --</option>
                                 {parts.map(p => (
                                     <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
@@ -585,33 +592,36 @@ const TransferStockModal: React.FC<{
 
                          <div className="grid grid-cols-2 gap-4">
                              <div>
-                                <label className="block text-sm font-medium text-gray-700">Từ chi nhánh</label>
-                                <select value={fromBranchId} onChange={e => setFromBranchId(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900">
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Từ chi nhánh</label>
+                                <select value={fromBranchId} onChange={e => setFromBranchId(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100">
                                     {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Đến chi nhánh</label>
-                                <select value={toBranchId} onChange={e => setToBranchId(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900" disabled={!fromBranchId}>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Đến chi nhánh</label>
+                                <select value={toBranchId} onChange={e => setToBranchId(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" disabled={!fromBranchId}>
                                     <option value="">-- Chọn --</option>
                                     {branches.filter(b => b.id !== fromBranchId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                                 </select>
                             </div>
                          </div>
                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Số lượng chuyển</label>
-                            <input type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} min="1" max={maxQuantity} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900" />
-                            <p className="text-xs text-gray-500 mt-1">Tồn kho tại chi nhánh nguồn: {maxQuantity}</p>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Số lượng chuyển</label>
+                            <input type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} min="1" max={maxQuantity} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Tồn kho tại chi nhánh nguồn: {maxQuantity}</p>
                             {quantity > maxQuantity && <p className="text-red-500 text-xs mt-1">Số lượng vượt quá tồn kho!</p>}
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Ghi chú</label>
-                            <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="VD: Điều chuyển hàng cuối tháng" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"/>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Ghi chú</label>
+                            <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="VD: Điều chuyển hàng cuối tháng" className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100"/>
                         </div>
                     </div>
                 </div>
-                <div className="bg-gray-50 px-6 py-3 flex justify-end space-x-3">
-                    <button type="button" onClick={onClose} className="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">Hủy</button>
+                <div className="bg-slate-50 dark:bg-slate-800 px-6 py-3 flex justify-end space-x-3 border-t dark:border-slate-700">
+                    <button type="button" onClick={onClose} className="flex items-center gap-2 bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">
+                        <ArrowUturnLeftIcon className="w-5 h-5" />
+                        Trở về
+                    </button>
                     <button type="button" onClick={handleSubmit} disabled={isFormInvalid} className="bg-orange-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-orange-600 disabled:bg-orange-300 disabled:cursor-not-allowed">
                         Tạo phiếu
                     </button>
@@ -668,49 +678,61 @@ const CategorySettingsModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col">
-                <div className="p-6 border-b">
-                    <h2 className="text-2xl font-bold text-gray-800">Cài đặt Danh mục sản phẩm</h2>
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col">
+                <div className="p-6 border-b dark:border-slate-700">
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Cài đặt Danh mục sản phẩm</h2>
                 </div>
                 <div className="p-6 overflow-y-auto space-y-3">
                     {editingCategories.map((cat, index) => (
                         <div key={index} className="flex items-center space-x-2">
-                            <input 
-                                type="text" 
-                                value={cat} 
-                                onChange={(e) => handleNameChange(index, e.target.value)}
-                                className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                            <input
+                                type="text"
+                                value={cat}
+                                onChange={e => handleNameChange(index, e.target.value)}
+                                className="block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500"
                             />
-                            <button onClick={() => onDelete(cat)} className="p-2 text-red-500 hover:bg-red-100 rounded-md">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (window.confirm(`Bạn có chắc muốn xóa danh mục "${categories[index]}"? Các sản phẩm thuộc danh mục này sẽ được chuyển về "Chưa phân loại".`)) {
+                                        onDelete(categories[index]);
+                                    }
+                                }}
+                                className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-md flex-shrink-0"
+                                title="Xóa danh mục"
+                            >
                                 <TrashIcon className="w-5 h-5"/>
                             </button>
                         </div>
                     ))}
-                </div>
-                <div className="p-6 border-t space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">Thêm danh mục mới</label>
-                     <div className="flex items-center space-x-2">
-                        <input
-                            type="text"
-                            placeholder="Tên danh mục mới"
-                            value={newCategoryName}
-                            onChange={(e) => setNewCategoryName(e.target.value)}
-                            className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-                        />
-                         <button onClick={handleAddNewCategory} className="flex items-center bg-blue-600 text-white font-semibold py-2 px-3 rounded-lg hover:bg-blue-700">
-                             <PlusIcon className="w-4 h-4 mr-1"/> Thêm
-                         </button>
+                    <div className="pt-4 border-t dark:border-slate-700">
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Thêm danh mục mới</p>
+                        <div className="flex items-center space-x-2">
+                            <input
+                                type="text"
+                                value={newCategoryName}
+                                onChange={e => setNewCategoryName(e.target.value)}
+                                placeholder="Tên danh mục mới..."
+                                className="block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md"
+                                onKeyDown={e => { if (e.key === 'Enter') handleAddNewCategory(); }}
+                            />
+                            <button type="button" onClick={handleAddNewCategory} className="px-4 py-2 bg-sky-600 text-white rounded-md text-sm font-medium hover:bg-sky-700 flex-shrink-0">Thêm</button>
+                        </div>
                     </div>
                 </div>
-                <div className="bg-gray-50 px-6 py-3 flex justify-end space-x-3 mt-auto">
-                    <button type="button" onClick={onClose} className="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">Hủy</button>
-                    <button type="button" onClick={handleSaveChanges} className="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700">Cập nhật</button>
+                 <div className="bg-slate-50 dark:bg-slate-800 px-6 py-3 mt-auto border-t dark:border-slate-700 flex justify-end space-x-3">
+                    <button type="button" onClick={onClose} className="flex items-center gap-2 bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">
+                        <ArrowUturnLeftIcon className="w-5 h-5" />
+                        Trở về
+                    </button>
+                    <button type="button" onClick={handleSaveChanges} className="bg-orange-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-orange-600">Lưu thay đổi</button>
                 </div>
             </div>
         </div>
     );
 };
 
+// --- Main Component ---
 interface InventoryManagerProps {
     currentUser: User;
     parts: Part[];
@@ -722,735 +744,190 @@ interface InventoryManagerProps {
 }
 
 const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts, setParts, transactions, setTransactions, currentBranchId, storeSettings }) => {
-    const [activeTab, setActiveTab] = useState<'inventory' | 'category' | 'lookup' | 'history'>('inventory');
     const [isPartModalOpen, setIsPartModalOpen] = useState(false);
-    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+    const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+    const [transactionType, setTransactionType] = useState<'Nhập kho' | 'Xuất kho'>('Nhập kho');
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
-    const [isCategorySettingsOpen, setIsCategorySettingsOpen] = useState(false);
+    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [selectedPart, setSelectedPart] = useState<Part | null>(null);
-    const [historyModalPart, setHistoryModalPart] = useState<Part | null>(null);
-    const [historySearchTerm, setHistorySearchTerm] = useState('');
-    const [categorySearchTerm, setCategorySearchTerm] = useState('');
-    const [inventorySearchTerm, setInventorySearchTerm] = useState('');
-    const [inventoryStatusFilter, setInventoryStatusFilter] = useState('all');
-    const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState('all');
-    const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
-    const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [activeActionMenu, setActiveActionMenu] = useState<string | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
 
-    const [allCategories, setAllCategories] = useState<string[]>([]);
-    
-    // State for the new lookup tab
-    const [selectedModel, setSelectedModel] = useState('Tất cả');
-    const [lookupCurrentPage, setLookupCurrentPage] = useState(1);
-    const LOOKUP_ITEMS_PER_PAGE = 20;
+    const filteredParts = useMemo(() => {
+        return parts.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku.toLowerCase().includes(searchTerm.toLowerCase()));
+    }, [parts, searchTerm]);
 
-    const motorcycleModels = useMemo(() => {
-        const models = new Set<string>();
-        hondaPartsData.forEach(p => p.model.forEach(m => models.add(m)));
-        return ['Tất cả', ...Array.from(models).sort()];
-    }, []);
+    const paginatedParts = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return filteredParts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filteredParts, currentPage]);
+
+    const totalPages = Math.ceil(filteredParts.length / ITEMS_PER_PAGE);
+
+    const allCategories = useMemo(() => Array.from(new Set(parts.map(p => p.category).filter((c): c is string => !!c))).sort(), [parts]);
 
     useEffect(() => {
-        const derivedCategories = Array.from(new Set(parts.map(p => p.category).filter((c): c is string => !!c)));
-        setAllCategories(prevCategories => {
-            // This ensures that categories manually added but not yet used are preserved
-            const combined = new Set([...derivedCategories, ...prevCategories]);
-            return Array.from(combined).sort();
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setActiveActionMenu(null);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    // --- Handlers ---
+    const handleSavePart = (part: Part) => {
+        setParts(prev => {
+            const exists = prev.some(p => p.id === part.id);
+            return exists ? prev.map(p => (p.id === part.id ? part : p)) : [part, ...prev];
         });
-    }, [parts]);
-    
-    const inventorySummary = useMemo(() => {
-        const summary = { totalQuantity: 0, totalValue: 0 };
-        parts.forEach(part => {
-            const stockInBranch = part.stock[currentBranchId] || 0;
-            summary.totalQuantity += stockInBranch;
-            summary.totalValue += stockInBranch * part.price;
-        });
-        return summary;
-    }, [parts, currentBranchId]);
-    
-    const handleOpenPartModal = (part: Part | null = null) => {
-        setSelectedPart(part);
-        setIsPartModalOpen(true);
-        setOpenMenuId(null);
     };
 
-    const handleClosePartModal = () => {
-        setIsPartModalOpen(false);
-        setSelectedPart(null);
-    };
-
-    const handleSavePart = (partData: Part) => {
-        const isEditing = parts.some(p => p.id === partData.id);
-        if (isEditing) {
-            setParts(prev => prev.map(p => (p.id === partData.id ? partData : p)));
-        } else {
-            setParts(prev => [partData, ...prev]);
-        }
-    };
-    
     const handleDeletePart = (partId: string) => {
-        if (window.confirm('Bạn có chắc chắn muốn xóa phụ tùng này? Hành động này không thể hoàn tác.')) {
+        if (window.confirm("Bạn có chắc muốn xóa phụ tùng này? Hành động này không thể hoàn tác.")) {
             setParts(prev => prev.filter(p => p.id !== partId));
         }
-        setOpenMenuId(null);
     };
 
-    const handleAddCategory = (newCategory: string) => {
-       const trimmedName = newCategory.trim();
-       if (trimmedName && !allCategories.includes(trimmedName)) {
-           setAllCategories(prev => [...prev, trimmedName].sort());
-       }
-    };
-
-    const handleEditCategory = (oldName: string, newName: string) => {
-        const trimmedNewName = newName.trim();
-        if (!trimmedNewName || oldName === trimmedNewName) return;
-
-        if (allCategories.some(c => c.toLowerCase() === trimmedNewName.toLowerCase() && c.toLowerCase() !== oldName.toLowerCase())) {
-            alert(`Danh mục "${trimmedNewName}" đã tồn tại.`);
-            return;
-        }
-        
-        setParts(prev => prev.map(p => p.category === oldName ? { ...p, category: trimmedNewName } : p));
-        setAllCategories(prev => {
-            const newCategories = new Set(prev.filter(c => c !== oldName));
-            newCategories.add(trimmedNewName);
-            return Array.from(newCategories).sort();
-        });
-    };
-    
-    const handleDeleteCategory = (name: string) => {
-         if (window.confirm(`Bạn có chắc chắn muốn xóa danh mục "${name}" không? Các sản phẩm thuộc danh mục này sẽ được gán là "Chưa phân loại".`)) {
-            setParts(prev => prev.map(p => p.category === name ? { ...p, category: '' } : p));
-            setAllCategories(prev => prev.filter(c => c !== name));
-        }
-    };
-
-    const handleSaveTransaction = (transaction: Omit<InventoryTransaction, 'id'|'date'|'totalPrice'>) => {
-        const part = parts.find(p => p.id === transaction.partId);
-        if (!part) return;
-
+    const handleSaveTransaction = (transaction: Omit<InventoryTransaction, 'id' | 'date' | 'totalPrice'>) => {
         const newTransaction: InventoryTransaction = {
-            ...transaction,
             id: `T-${Date.now()}`,
             date: new Date().toISOString().split('T')[0],
-            unitPrice: transaction.type === 'Nhập kho' ? transaction.unitPrice : part.sellingPrice,
-            totalPrice: (transaction.type === 'Nhập kho' ? transaction.unitPrice ?? part.price : part.sellingPrice) * transaction.quantity,
+            totalPrice: (transaction.unitPrice || 0) * transaction.quantity,
+            ...transaction
         };
-
         setTransactions(prev => [newTransaction, ...prev]);
 
         setParts(prevParts => prevParts.map(p => {
-            if (p.id === transaction.partId) {
+            if (p.id === newTransaction.partId) {
                 const newStock = { ...p.stock };
-                const currentStock = newStock[currentBranchId] || 0;
-                newStock[currentBranchId] = transaction.type === 'Nhập kho'
-                    ? currentStock + transaction.quantity
-                    : currentStock - transaction.quantity;
-                return { ...p, stock: newStock };
+                const currentStock = newStock[newTransaction.branchId] || 0;
+                newStock[newTransaction.branchId] = newTransaction.type === 'Nhập kho'
+                    ? currentStock + newTransaction.quantity
+                    : currentStock - newTransaction.quantity;
+                
+                const updatedPart = { ...p, stock: newStock };
+                if (newTransaction.type === 'Nhập kho' && newTransaction.unitPrice) {
+                    updatedPart.price = newTransaction.unitPrice;
+                }
+                return updatedPart;
             }
             return p;
         }));
-
-        setIsExportModalOpen(false);
+        setIsTransactionModalOpen(false);
     };
 
     const handleSaveTransfer = (transfer: { partId: string; fromBranchId: string; toBranchId: string; quantity: number; notes: string }) => {
-        const { partId, fromBranchId, toBranchId, quantity, notes } = transfer;
-        const part = parts.find(p => p.id === partId);
-        if (!part) return;
-
         const transferId = `TR-${Date.now()}`;
-        const fromBranchName = storeSettings.branches.find(b => b.id === fromBranchId)?.name;
-        const toBranchName = storeSettings.branches.find(b => b.id === toBranchId)?.name;
+        
+        // Create two transactions: one export, one import
+        const part = parts.find(p => p.id === transfer.partId);
+        if(!part) return;
 
-        const exportTransaction: InventoryTransaction = {
-            id: `T-EX-${Date.now()}`, type: 'Xuất kho', partId, partName: part.name, quantity,
-            date: new Date().toISOString().split('T')[0], notes: `Chuyển đến ${toBranchName}. ${notes}`,
-            branchId: fromBranchId, transferId, unitPrice: part.price, totalPrice: part.price * quantity,
-        };
+        const exportTx: InventoryTransaction = { id: `T-EXP-${transferId}`, type: 'Xuất kho', partId: transfer.partId, partName: part.name, quantity: transfer.quantity, date: new Date().toISOString().split('T')[0], notes: `Chuyển đến ${storeSettings.branches.find(b => b.id === transfer.toBranchId)?.name}. ${transfer.notes}`, unitPrice: part.price, totalPrice: part.price * transfer.quantity, branchId: transfer.fromBranchId, transferId };
+        const importTx: InventoryTransaction = { id: `T-IMP-${transferId}`, type: 'Nhập kho', partId: transfer.partId, partName: part.name, quantity: transfer.quantity, date: new Date().toISOString().split('T')[0], notes: `Nhận từ ${storeSettings.branches.find(b => b.id === transfer.fromBranchId)?.name}. ${transfer.notes}`, unitPrice: part.price, totalPrice: part.price * transfer.quantity, branchId: transfer.toBranchId, transferId };
 
-        const importTransaction: InventoryTransaction = {
-            id: `T-IM-${Date.now()}`, type: 'Nhập kho', partId, partName: part.name, quantity,
-            date: new Date().toISOString().split('T')[0], notes: `Nhận từ ${fromBranchName}. ${notes}`,
-            branchId: toBranchId, transferId, unitPrice: part.price, totalPrice: part.price * quantity,
-        };
+        setTransactions(prev => [exportTx, importTx, ...prev]);
 
-        setTransactions(prev => [exportTransaction, importTransaction, ...prev]);
         setParts(prevParts => prevParts.map(p => {
-            if (p.id === partId) {
+            if (p.id === transfer.partId) {
                 const newStock = { ...p.stock };
-                newStock[fromBranchId] = (newStock[fromBranchId] || 0) - quantity;
-                newStock[toBranchId] = (newStock[toBranchId] || 0) + quantity;
+                newStock[transfer.fromBranchId] = (newStock[transfer.fromBranchId] || 0) - transfer.quantity;
+                newStock[transfer.toBranchId] = (newStock[transfer.toBranchId] || 0) + transfer.quantity;
                 return { ...p, stock: newStock };
             }
             return p;
         }));
         setIsTransferModalOpen(false);
     };
-    
-    const handleAddFromReference = (refPart: Omit<Part, 'id' | 'stock'>) => {
-        const existingPart = parts.find(p => p.sku.toLowerCase() === refPart.sku.toLowerCase());
-        if (existingPart) {
-            handleOpenPartModal(existingPart);
-        } else {
-            const newPartTemplate: Part = {
-                id: '', // Falsy value, onSave will create a new ID
-                name: refPart.name,
-                sku: refPart.sku,
-                category: refPart.category,
-                price: refPart.price, // Use price from reference
-                sellingPrice: refPart.sellingPrice, // Use selling price from reference
-                stock: {},
-            };
-            handleOpenPartModal(newPartTemplate);
-        }
-    };
 
-    const filteredTransactions = useMemo(() => {
-        return transactions
-            .filter(tx =>
-                tx.partName.toLowerCase().includes(historySearchTerm.toLowerCase()) ||
-                tx.id.toLowerCase().includes(historySearchTerm.toLowerCase()) ||
-                tx.notes.toLowerCase().includes(historySearchTerm.toLowerCase())
-            )
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [transactions, historySearchTerm]);
-
-    const filteredPartsForCategoryTab = useMemo(() => {
-        return parts.filter(part => {
-            const searchMatch = categorySearchTerm === '' ||
-                part.name.toLowerCase().includes(categorySearchTerm.toLowerCase()) ||
-                part.sku.toLowerCase().includes(categorySearchTerm.toLowerCase());
-            const categoryMatch = selectedCategoryFilter === 'all' || part.category === selectedCategoryFilter;
-            return searchMatch && categoryMatch;
-        });
-    }, [parts, categorySearchTerm, selectedCategoryFilter]);
-    
-    const filteredInventoryParts = useMemo(() => {
-        const lastTransactionDateMap = new Map<string, string>();
-        transactions.forEach(tx => {
-            const existingDate = lastTransactionDateMap.get(tx.partId);
-            if (!existingDate || new Date(tx.date) > new Date(existingDate)) {
-                lastTransactionDateMap.set(tx.partId, tx.date);
-            }
-        });
-
-        return parts.filter(part => {
-            const stock = part.stock[currentBranchId] || 0;
-
-            const searchMatch = !inventorySearchTerm ||
-                part.name.toLowerCase().includes(inventorySearchTerm.toLowerCase()) ||
-                part.sku.toLowerCase().includes(inventorySearchTerm.toLowerCase());
-
-            const categoryMatch = inventoryCategoryFilter === 'all' || part.category === inventoryCategoryFilter;
-
-            let statusMatch = false;
-            switch (inventoryStatusFilter) {
-                case 'all':
-                    statusMatch = true;
-                    break;
-                case 'in-stock':
-                    statusMatch = stock > 0;
-                    break;
-                case 'out-of-stock':
-                    statusMatch = stock === 0;
-                    break;
-                case 'low-stock':
-                    statusMatch = stock > 0 && stock < 5;
-                    break;
-                case 'slow-moving':
-                    const lastTxDate = lastTransactionDateMap.get(part.id);
-                    if (stock > 0 && lastTxDate) {
-                        const daysSinceLastTx = (new Date().getTime() - new Date(lastTxDate).getTime()) / (1000 * 3600 * 24);
-                        statusMatch = daysSinceLastTx > 60;
-                    } else {
-                        statusMatch = false; 
-                    }
-                    break;
-                default:
-                    statusMatch = true;
-            }
-
-            return searchMatch && categoryMatch && statusMatch;
-        });
-    }, [parts, transactions, inventorySearchTerm, inventoryCategoryFilter, inventoryStatusFilter, currentBranchId]);
-    
-    // --- Lookup Tab Logic ---
-    const filteredReferenceParts = useMemo(() => {
-        if (selectedModel === 'Tất cả') return hondaPartsData;
-        return hondaPartsData.filter(p => p.model.includes(selectedModel));
-    }, [selectedModel]);
-
-    const paginatedReferenceParts = useMemo(() => {
-        const startIndex = (lookupCurrentPage - 1) * LOOKUP_ITEMS_PER_PAGE;
-        return filteredReferenceParts.slice(startIndex, startIndex + LOOKUP_ITEMS_PER_PAGE);
-    }, [filteredReferenceParts, lookupCurrentPage]);
-    
-    const totalLookupPages = Math.ceil(filteredReferenceParts.length / LOOKUP_ITEMS_PER_PAGE);
-
-    
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (openMenuId && !(event.target as HTMLElement).closest('.menu-container')) {
-                setOpenMenuId(null);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [openMenuId]);
-
-    // --- CSV Upload Logic ---
-    const handleUploadClick = () => {
-        fileInputRef.current?.click();
-    };
-
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const text = e.target?.result;
-            if (typeof text === 'string') {
-                parseCSVAndImport(text);
-            }
-        };
-        reader.readAsText(file, 'UTF-8');
-        event.target.value = ''; // Reset file input to allow re-uploading the same file
-    };
-    
-    const parseCSVAndImport = (csvText: string) => {
-        try {
-            const lines = csvText.trim().split('\n');
-            const headerRow = lines[0];
-
-            if (!headerRow.toLowerCase().includes('danh mục sản phẩm') || !headerRow.toLowerCase().includes('đơn giá nhập')) {
-                 alert('Tệp không đúng định dạng. Cột tiêu đề phải chứa "Danh mục sản phẩm" và "Đơn giá nhập".');
-                 return;
-            }
-
-            const rows = lines.slice(1);
-
-            let addedCount = 0;
-            let updatedCount = 0;
-            let skippedCount = 0;
-            
-            let updatedPartsList = [...parts];
-            const newTransactions: InventoryTransaction[] = [];
-
-            rows.forEach((rowStr, index) => {
-                // Basic CSV parser to handle comma-separated values, stripping quotes
-                const row = rowStr.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-                
-                if (row.length < 6) {
-                    skippedCount++;
-                    return;
-                }
-                
-                const name = row[1]?.trim();
-                const priceStr = row[2]?.trim();
-                const sellingPriceStr = row[3]?.trim();
-                const stockStr = row[5]?.trim();
-
-                if (!name || !priceStr || !sellingPriceStr || stockStr === undefined) {
-                    skippedCount++;
-                    return;
-                }
-
-                const price = parseFloat(priceStr.replace(/\./g, ''));
-                const sellingPrice = parseFloat(sellingPriceStr.replace(/\./g, ''));
-                const stock = parseInt(stockStr, 10) || 0;
-
-                if (isNaN(price) || isNaN(sellingPrice)) {
-                     skippedCount++;
-                     return;
-                }
-
-                const existingPartIndex = updatedPartsList.findIndex(p => p.name === name);
-                
-                let partIdForTransaction: string;
-
-                if (existingPartIndex > -1) { // Part exists, update it
-                    const existingPart = updatedPartsList[existingPartIndex];
-                    const updatedPart = {
-                        ...existingPart,
-                        price,
-                        sellingPrice,
-                        stock: {
-                            ...existingPart.stock,
-                            [currentBranchId]: (existingPart.stock[currentBranchId] || 0) + stock,
-                        }
-                    };
-                    updatedPartsList[existingPartIndex] = updatedPart;
-                    partIdForTransaction = existingPart.id;
-                    updatedCount++;
-                } else { // New part
-                    const newPartId = `P${Date.now()}-${index}`;
-                    partIdForTransaction = newPartId;
-                    const firstWord = name.split(' ')[0] || `SKU${index}`;
-                    const sku = updatedPartsList.some(p => p.sku === firstWord) ? `${firstWord}-${Date.now()}` : firstWord;
-
-                    const newPart: Part = {
-                        id: newPartId, name, sku, price, sellingPrice,
-                        stock: { [currentBranchId]: stock },
-                        category: 'Chưa phân loại'
-                    };
-                    updatedPartsList.push(newPart);
-                    addedCount++;
-                }
-
-                if (stock > 0) {
-                     newTransactions.push({
-                        id: `T-IMP-${Date.now()}-${index}`, type: 'Nhập kho', partId: partIdForTransaction,
-                        partName: name, quantity: stock, date: new Date().toISOString().split('T')[0],
-                        notes: 'Nhập kho từ tệp CSV', unitPrice: price, totalPrice: price * stock,
-                        branchId: currentBranchId,
-                    });
-                }
-            });
-
-            // Batch update state
-            setParts(updatedPartsList);
-            
-            if (newTransactions.length > 0) {
-                 setTransactions(prev => [...newTransactions, ...prev]);
-            }
-            
-            let message = `Nhập tệp thành công! ${addedCount} sản phẩm mới, ${updatedCount} sản phẩm được cập nhật.`;
-            if (skippedCount > 0) {
-                message += ` Đã bỏ qua ${skippedCount} dòng do lỗi dữ liệu.`
-            }
-            alert(message);
-        } catch (error) {
-            console.error("Lỗi khi xử lý tệp CSV:", error);
-            alert("Đã xảy ra lỗi khi xử lý tệp. Vui lòng kiểm tra định dạng và thử lại.");
+    const handleCategoryAction = (action: 'add' | 'edit' | 'delete', payload: any) => {
+        switch(action) {
+            case 'add':
+                // The onAdd in PartModal will already handle this via callback
+                break;
+            case 'edit':
+                setParts(prev => prev.map(p => p.category === payload.oldName ? { ...p, category: payload.newName } : p));
+                break;
+            case 'delete':
+                setParts(prev => prev.map(p => p.category === payload.name ? { ...p, category: 'Chưa phân loại' } : p));
+                break;
         }
     };
 
     return (
-        <div>
-            <PartModal isOpen={isPartModalOpen} onClose={handleClosePartModal} onSave={handleSavePart} part={selectedPart} parts={parts} allCategories={allCategories} onAddCategory={handleAddCategory} currentBranchId={currentBranchId} />
-            <TransactionModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} onSave={handleSaveTransaction} parts={parts} type="Xuất kho" currentBranchId={currentBranchId} />
-            <HistoryModal part={historyModalPart} onClose={() => setHistoryModalPart(null)} transactions={transactions} storeSettings={storeSettings} />
-            <TransferStockModal isOpen={isTransferModalOpen} onClose={() => setIsTransferModalOpen(false)} onSave={handleSaveTransfer} parts={parts} branches={storeSettings.branches} currentBranchId={currentBranchId} />
-            <CategorySettingsModal isOpen={isCategorySettingsOpen} onClose={() => setIsCategorySettingsOpen(false)} categories={allCategories} onAdd={handleAddCategory} onEdit={handleEditCategory} onDelete={handleDeleteCategory} />
-            
-            <div className="border-b border-gray-200 mb-6">
-                <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-                    <button onClick={() => setActiveTab('inventory')} className={`flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'inventory' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
-                        <ArchiveBoxIcon className="w-5 h-5 mr-2" /> Tồn kho
-                    </button>
-                     <button onClick={() => setActiveTab('category')} className={`flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'category' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
-                        <ArchiveBoxIcon className="w-5 h-5 mr-2" /> Danh mục sản phẩm
-                    </button>
-                     <button onClick={() => setActiveTab('lookup')} className={`flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'lookup' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
-                        <DocumentTextIcon className="w-5 h-5 mr-2" /> Tra cứu Phụ tùng
-                    </button>
-                    <button onClick={() => setActiveTab('history')} className={`flex items-center whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'history' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
-                        <DocumentTextIcon className="w-5 h-5 mr-2" /> Lịch sử
-                    </button>
-                </nav>
-            </div>
-            
-            {activeTab === 'inventory' && (
-                <div>
-                     <div className="flex flex-col sm:flex-row justify-end sm:items-center mb-6 gap-4">
-                         <div className="flex flex-wrap gap-2">
-                            <Link to="/inventory/goods-receipt/new" className="flex items-center bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-green-700">
-                                <PlusIcon /> <span className="ml-2 hidden sm:inline">Tạo phiếu nhập</span>
-                            </Link>
-                            <button onClick={() => setIsExportModalOpen(true)} className="flex items-center bg-red-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-red-600">
-                                <MinusIcon /> <span className="ml-2 hidden sm:inline">Xuất Kho</span>
-                            </button>
-                             <button onClick={() => setIsTransferModalOpen(true)} className="flex items-center bg-orange-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-orange-600">
-                                <ArrowsRightLeftIcon className="w-5 h-5" /> <span className="ml-2 hidden sm:inline">Chuyển kho</span>
-                            </button>
-                            <button onClick={() => handleOpenPartModal()} className="flex items-center bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700">
-                                <PlusIcon /> <span className="ml-2 hidden sm:inline">Thêm Mới</span>
-                            </button>
-                        </div>
-                    </div>
+        <div className="space-y-6">
+             {/* Modals */}
+             <PartModal isOpen={isPartModalOpen} onClose={() => setIsPartModalOpen(false)} onSave={handleSavePart} part={selectedPart} parts={parts} allCategories={allCategories} onAddCategory={(name) => handleCategoryAction('add', { name })} currentBranchId={currentBranchId} />
+             <TransactionModal isOpen={isTransactionModalOpen} onClose={() => setIsTransactionModalOpen(false)} onSave={handleSaveTransaction} parts={parts} type={transactionType} currentBranchId={currentBranchId} />
+             <HistoryModal part={selectedPart} transactions={transactions} onClose={() => { setIsHistoryModalOpen(false); setSelectedPart(null); }} storeSettings={storeSettings} />
+             <TransferStockModal isOpen={isTransferModalOpen} onClose={() => setIsTransferModalOpen(false)} onSave={handleSaveTransfer} parts={parts} branches={storeSettings.branches} currentBranchId={currentBranchId} />
+             <CategorySettingsModal isOpen={isCategoryModalOpen} onClose={() => setIsCategoryModalOpen(false)} categories={allCategories} onAdd={(name) => handleCategoryAction('add', { name })} onEdit={(oldName, newName) => handleCategoryAction('edit', { oldName, newName })} onDelete={(name) => handleCategoryAction('delete', { name })} />
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <input
-                            type="text"
-                            placeholder="Tìm kiếm theo tên hoặc SKU..."
-                            value={inventorySearchTerm}
-                            onChange={e => setInventorySearchTerm(e.target.value)}
-                            className="w-full p-3 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-900"
-                        />
-                         <select
-                            value={inventoryStatusFilter}
-                            onChange={e => setInventoryStatusFilter(e.target.value)}
-                            className="w-full p-3 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-900 bg-white"
-                        >
-                            <option value="all">Tất cả</option>
-                            <option value="in-stock">Còn hàng</option>
-                            <option value="out-of-stock">Hết hàng</option>
-                            <option value="low-stock">Dưới định mức tồn</option>
-                            <option value="slow-moving">Tồn kho quá 60 ngày</option>
-                        </select>
-                        <select
-                            value={inventoryCategoryFilter}
-                            onChange={e => setInventoryCategoryFilter(e.target.value)}
-                            className="w-full p-3 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-900 bg-white"
-                        >
-                            <option value="all">Tất cả danh mục</option>
-                            {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                        </select>
+            {/* Header and Actions */}
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                    <input type="text" placeholder="Tìm kiếm phụ tùng (tên, SKU)..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full sm:w-72 p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 dark:text-slate-100" />
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <button onClick={() => { setSelectedPart(null); setIsPartModalOpen(true); }} className="flex items-center gap-2 bg-sky-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-sky-700 text-sm"><PlusIcon/> Thêm SP</button>
+                        <Link to="/inventory/goods-receipt/new" className="flex items-center gap-2 bg-green-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-green-700 text-sm"><CloudArrowUpIcon/> Phiếu nhập</Link>
+                        <button onClick={() => { setTransactionType('Xuất kho'); setIsTransactionModalOpen(true); }} className="flex items-center gap-2 bg-red-500 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-red-600 text-sm"><MinusIcon/> Xuất lẻ</button>
+                        <button onClick={() => setIsTransferModalOpen(true)} className="flex items-center gap-2 bg-orange-500 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-orange-600 text-sm"><ArrowsRightLeftIcon/> Chuyển kho</button>
+                        <button onClick={() => setIsCategoryModalOpen(true)} className="p-2.5 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600" title="Cài đặt danh mục"><Cog6ToothIcon className="w-5 h-5 text-slate-700 dark:text-slate-200"/></button>
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                        <div className="bg-white p-5 rounded-lg shadow-md flex items-center">
-                            <div className="p-3 rounded-full bg-blue-500 text-white"><ArchiveBoxIcon className="w-6 h-6" /></div>
-                            <div className="ml-4"><p className="text-sm text-gray-500 font-medium">Tổng SL tồn</p><p className="text-2xl font-bold text-gray-800">{inventorySummary.totalQuantity.toLocaleString('vi-VN')}</p></div>
-                        </div>
-                        <div className="bg-white p-5 rounded-lg shadow-md flex items-center">
-                            <div className="p-3 rounded-full bg-green-500 text-white"><BanknotesIcon className="w-6 h-6" /></div>
-                            <div className="ml-4"><p className="text-sm text-gray-500 font-medium">Giá trị tồn</p><p className="text-2xl font-bold text-gray-800">{formatCurrency(inventorySummary.totalValue)}</p></div>
-                        </div>
-                    </div>
-                    
-                    {filteredInventoryParts.length > 0 ? (
-                        <>
-                            <div className="lg:hidden space-y-4">
-                                {filteredInventoryParts.map(p => {
-                                    const stockInBranch = p.stock?.[currentBranchId] ?? 0;
-                                    const totalStock = Object.values(p.stock || {}).reduce((a: number, b: number) => a + b, 0);
-                                    return (
-                                        <div key={p.id} className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                    <p className="font-bold text-gray-800 flex items-center">{p.name} {stockInBranch > 0 && stockInBranch < 5 && <ExclamationTriangleIcon className="w-5 h-5 text-red-500 ml-2" />}</p>
-                                                    <p className="text-xs text-gray-500">{p.sku}</p>
-                                            </div>
-                                            <div className="flex items-center space-x-2">
-                                                <button onClick={() => handleOpenPartModal(p)} className="text-blue-600 p-1"><PencilSquareIcon className="w-5 h-5"/></button>
-                                                <button onClick={() => handleDeletePart(p.id)} className="text-red-600 p-1"><TrashIcon className="w-5 h-5"/></button>
-                                            </div>
-                                        </div>
-                                        <div className="mt-4 flex justify-between items-center text-sm">
-                                            <div className="text-center">
-                                                <p className="text-gray-500">Tồn kho</p>
-                                                <p className={`font-bold text-lg ${stockInBranch < 5 ? 'text-red-600' : 'text-blue-600'}`}>{stockInBranch}</p>
-                                                <p className="text-xs text-gray-400">Tổng: {totalStock}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-500 text-right">Giá nhập</p>
-                                                <p className="font-semibold text-gray-800 text-right">{formatCurrency(p.price)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-500 text-right">Giá bán</p>
-                                                <p className="font-bold text-gray-900 text-right">{formatCurrency(p.sellingPrice)}</p>
-                                            </div>
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-
-                            <div className="hidden lg:block bg-white p-6 rounded-lg shadow-md overflow-x-auto">
-                                <table className="w-full text-left min-w-max">
-                                    <thead><tr className="bg-gray-50 border-b"><th className="p-3 font-semibold text-gray-700">Tên Phụ tùng</th><th className="p-3 font-semibold text-gray-700">SKU</th><th className="p-3 font-semibold text-gray-700">Tồn kho (hiện tại)</th><th className="p-3 font-semibold text-gray-700">Tổng tồn kho</th><th className="p-3 font-semibold text-gray-700">Giá nhập</th><th className="p-3 font-semibold text-gray-700">Giá bán</th><th className="p-3 font-semibold text-gray-700">Hành động</th></tr></thead>
-                                    <tbody>
-                                        {filteredInventoryParts.map(p => {
-                                            const stockInBranch = p.stock?.[currentBranchId] ?? 0;
-                                            const totalStock = Object.values(p.stock || {}).reduce((a: number, b: number) => a + b, 0);
-                                            return (
-                                            <tr key={p.id} className="border-b hover:bg-gray-50">
-                                                <td className="p-3 font-semibold text-gray-900"><div className="flex items-center space-x-2"><span>{p.name}</span>{stockInBranch > 0 && stockInBranch < 5 && (<ExclamationTriangleIcon className="w-5 h-5 text-red-500" title={`Tồn kho thấp: ${stockInBranch}`} />)}</div></td>
-                                                <td className="p-3 text-gray-600">{p.sku}</td>
-                                                <td className={`p-3 font-medium ${stockInBranch < 5 ? 'text-red-600 font-bold' : 'text-gray-900'}`}>{stockInBranch}</td>
-                                                <td className="p-3 text-gray-700 font-medium">{totalStock}</td>
-                                                <td className="p-3 text-gray-800">{formatCurrency(p.price)}</td>
-                                                <td className="p-3 text-gray-800 font-semibold">{formatCurrency(p.sellingPrice)}</td>
-                                                <td className="p-3">
-                                                    <div className="flex items-center space-x-4">
-                                                        <button onClick={() => handleOpenPartModal(p)} className="text-blue-600 hover:text-blue-800" title="Chỉnh sửa"><PencilSquareIcon className="w-5 h-5"/></button>
-                                                        <button onClick={() => setHistoryModalPart(p)} className="text-gray-600 hover:text-gray-800" title="Xem lịch sử"><DocumentTextIcon className="w-5 h-5"/></button>
-                                                        <button onClick={() => handleDeletePart(p.id)} className="text-red-600 hover:text-red-800" title="Xóa"><TrashIcon className="w-5 h-5"/></button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )})}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="bg-white p-8 rounded-lg shadow-sm border border-slate-200/60 text-center text-slate-500">
-                            <p className="font-semibold">Không tìm thấy phụ tùng nào</p>
-                            <p className="text-sm">Thử thay đổi từ khóa tìm kiếm của bạn.</p>
-                        </div>
-                    )}
                 </div>
-            )}
+            </div>
 
-            {activeTab === 'category' && (
-                <div>
-                     <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
-                        <h1 className="text-3xl font-bold text-gray-800">Danh mục sản phẩm</h1>
-                         <div className="flex items-center gap-2">
-                             <button onClick={() => setIsCategorySettingsOpen(true)} className="p-2 bg-gray-200 rounded-lg hover:bg-gray-300"><Cog6ToothIcon className="w-6 h-6 text-gray-700"/></button>
-                             <button
-                                onClick={handleUploadClick}
-                                className="flex items-center bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-green-700"
-                                title="Tải lên tệp CSV (Tên,Mã SP,Danh mục,Giá nhập,Giá bán,Tồn kho)"
-                            >
-                                <CloudArrowUpIcon className="w-5 h-5" /> <span className="ml-2 hidden sm:inline">Tải lên</span>
-                            </button>
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                onChange={handleFileChange}
-                                className="hidden"
-                                accept=".csv"
-                            />
-                            <button onClick={() => handleOpenPartModal()} className="flex items-center bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700">
-                                <PlusIcon /> <span className="ml-2 hidden sm:inline">Thêm Phụ tùng</span>
-                            </button>
-                        </div>
-                    </div>
-
-                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <input type="text" placeholder="Tìm theo tên, SKU..." value={categorySearchTerm} onChange={e => setCategorySearchTerm(e.target.value)} className="md:col-span-2 w-full p-3 border rounded-lg text-gray-900"/>
-                        <select value={selectedCategoryFilter} onChange={e => setSelectedCategoryFilter(e.target.value)} className="w-full p-3 border rounded-lg text-gray-900 bg-white">
-                            <option value="all">Tất cả danh mục</option>
-                            {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                        </select>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {filteredPartsForCategoryTab.map(part => {
-                            const stockInBranch = part.stock[currentBranchId] || 0;
-                            return (
-                                <div key={part.id} className="bg-white p-4 rounded-lg shadow-md border flex flex-col">
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex items-start space-x-4">
-                                            <div className="w-12 h-12 bg-gray-100 rounded-md flex items-center justify-center flex-shrink-0">
-                                                <ArchiveBoxIcon className="w-8 h-8 text-gray-400" />
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-gray-800">{part.name}</p>
-                                                <p className="text-xs text-gray-500">{part.sku}</p>
-                                                <p className="text-xs text-blue-600 font-medium mt-1">{part.category || 'Chưa phân loại'}</p>
-                                            </div>
-                                        </div>
-                                         <div className="relative menu-container">
-                                            <button onClick={() => setOpenMenuId(openMenuId === part.id ? null : part.id)} className="p-1 text-gray-500 hover:text-gray-800"><EllipsisVerticalIcon className="w-5 h-5" /></button>
-                                             {openMenuId === part.id && (
-                                                <div className="absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg z-10 border">
-                                                    <a href="#" onClick={(e) => { e.preventDefault(); handleOpenPartModal(part); }} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Chỉnh sửa</a>
-                                                    <a href="#" onClick={(e) => { e.preventDefault(); handleDeletePart(part.id); }} className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Xóa</a>
-                                                </div>
-                                             )}
-                                        </div>
-                                    </div>
-                                    <div className="mt-4 pt-4 border-t space-y-2 flex-grow">
-                                        <div className="flex justify-between text-sm"><span className="text-gray-500">Giá nhập:</span> <span className="font-medium text-gray-800">{formatCurrency(part.price)}</span></div>
-                                        <div className="flex justify-between text-sm"><span className="text-gray-500">Giá bán:</span> <span className="font-semibold text-green-600">{formatCurrency(part.sellingPrice)}</span></div>
-                                    </div>
-                                    <div className="mt-2 text-right">
-                                        {stockInBranch > 0 && stockInBranch < 5 && (
-                                            <div className="inline-flex items-center text-xs text-red-600 font-semibold bg-red-100 px-2 py-1 rounded-full">
-                                                <ExclamationTriangleIcon className="w-4 h-4 mr-1" />
-                                                Tồn kho thấp: {stockInBranch}
+            {/* Content */}
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 overflow-x-auto">
+                <table className="w-full text-left min-w-max">
+                    <thead className="border-b dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50">
+                        <tr>
+                            <th className="p-4 font-semibold text-slate-600 dark:text-slate-300">Tên Phụ tùng</th>
+                            <th className="p-4 font-semibold text-slate-600 dark:text-slate-300">SKU</th>
+                            {storeSettings.branches.map(branch => (
+                                <th key={branch.id} className="p-4 font-semibold text-slate-600 dark:text-slate-300 text-center">{branch.name}</th>
+                            ))}
+                            <th className="p-4 font-semibold text-slate-600 dark:text-slate-300 text-right">Giá nhập</th>
+                            <th className="p-4 font-semibold text-slate-600 dark:text-slate-300 text-right">Giá bán</th>
+                            <th className="p-4 font-semibold text-slate-600 dark:text-slate-300 text-center">Tùy chọn</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {paginatedParts.map(part => (
+                            <tr key={part.id} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                <td className="p-4"><p className="font-semibold text-slate-800 dark:text-slate-100">{part.name}</p><p className="text-xs text-slate-500 dark:text-slate-400">{part.category}</p></td>
+                                <td className="p-4 text-slate-600 dark:text-slate-400 font-mono">{part.sku}</td>
+                                {storeSettings.branches.map(branch => {
+                                    const stock = part.stock[branch.id] || 0;
+                                    return <td key={branch.id} className={`p-4 text-center font-bold ${stock < 5 && stock > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-800 dark:text-slate-200'}`}>{stock}</td>;
+                                })}
+                                <td className="p-4 text-slate-700 dark:text-slate-300 text-right">{formatCurrency(part.price)}</td>
+                                <td className="p-4 text-sky-600 dark:text-sky-400 font-semibold text-right">{formatCurrency(part.sellingPrice)}</td>
+                                <td className="p-4 text-center">
+                                    <div className="relative inline-block" ref={activeActionMenu === part.id ? menuRef : null}>
+                                        <button onClick={() => setActiveActionMenu(part.id)} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300"><EllipsisVerticalIcon className="w-5 h-5"/></button>
+                                        {activeActionMenu === part.id && (
+                                            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-md shadow-lg border dark:border-slate-700 z-10">
+                                                <button onClick={() => { setSelectedPart(part); setIsPartModalOpen(true); setActiveActionMenu(null); }} className="block w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">Chỉnh sửa</button>
+                                                <button onClick={() => { setSelectedPart(part); setIsHistoryModalOpen(true); setActiveActionMenu(null); }} className="block w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">Lịch sử</button>
+                                                <button onClick={() => { handleDeletePart(part.id); setActiveActionMenu(null); }} className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/50">Xóa</button>
                                             </div>
                                         )}
                                     </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                     {filteredPartsForCategoryTab.length === 0 && <div className="text-center py-12 text-gray-500">Không tìm thấy sản phẩm nào.</div>}
-                </div>
-            )}
-            
-            {activeTab === 'lookup' && (
-                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200/60">
-                     <h2 className="text-2xl font-bold text-slate-800 mb-4">Tra cứu phụ tùng Honda Việt Nam</h2>
-                     <div className="mb-4">
-                         <label htmlFor="model-select" className="block text-sm font-medium text-slate-700 mb-1">Chọn dòng xe:</label>
-                         <select 
-                            id="model-select"
-                            value={selectedModel}
-                            onChange={e => { setSelectedModel(e.target.value); setLookupCurrentPage(1); }}
-                            className="w-full md:w-1/3 p-2 border border-slate-300 rounded-md bg-white focus:ring-sky-500 focus:border-sky-500"
-                        >
-                             {motorcycleModels.map(model => (
-                                 <option key={model} value={model}>{model}</option>
-                             ))}
-                         </select>
-                     </div>
-                     <div className="overflow-x-auto">
-                         <table className="w-full text-left">
-                             <thead className="bg-slate-100">
-                                 <tr>
-                                     <th className="p-3 font-semibold text-slate-600">Tên Phụ tùng</th>
-                                     <th className="p-3 font-semibold text-slate-600">Mã (SKU)</th>
-                                     <th className="p-3 font-semibold text-slate-600 text-right">Giá tham khảo</th>
-                                     <th className="p-3 font-semibold text-slate-600 text-right">Hành động</th>
-                                 </tr>
-                             </thead>
-                             <tbody>
-                                 {paginatedReferenceParts.map((refPart, index) => (
-                                     <tr key={`${refPart.sku}-${index}`} className="border-b hover:bg-slate-50">
-                                         <td className="p-3 text-slate-800 font-medium">{refPart.name}</td>
-                                         <td className="p-3 text-slate-600 font-mono text-sm">{refPart.sku}</td>
-                                         <td className="p-3 text-slate-800 font-semibold text-right">{formatCurrency(refPart.sellingPrice)}</td>
-                                         <td className="p-3 text-right">
-                                             <button 
-                                                 onClick={() => handleAddFromReference(refPart)} 
-                                                 className="px-3 py-1 bg-sky-100 text-sky-700 text-sm font-semibold rounded-md hover:bg-sky-200" 
-                                             >
-                                                 Thêm
-                                             </button>
-                                         </td>
-                                     </tr>
-                                 ))}
-                             </tbody>
-                         </table>
-                         {paginatedReferenceParts.length === 0 && <p className="text-center text-slate-500 py-8">Không có phụ tùng cho dòng xe này.</p>}
-                     </div>
-                     {totalLookupPages > 1 && (
-                        <div className="mt-4 flex justify-center items-center space-x-2">
-                            <button onClick={() => setLookupCurrentPage(p => Math.max(1, p - 1))} disabled={lookupCurrentPage === 1} className="px-3 py-1 border rounded-md disabled:opacity-50">&laquo;</button>
-                            <span className="text-sm">Trang {lookupCurrentPage} / {totalLookupPages}</span>
-                            <button onClick={() => setLookupCurrentPage(p => Math.min(totalLookupPages, p + 1))} disabled={lookupCurrentPage === totalLookupPages} className="px-3 py-1 border rounded-md disabled:opacity-50">&raquo;</button>
-                        </div>
-                     )}
-                 </div>
-            )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                {paginatedParts.length === 0 && <p className="text-center p-8 text-slate-500 dark:text-slate-400">Không tìm thấy phụ tùng nào.</p>}
+            </div>
 
-             {activeTab === 'history' && (
-                <div>
-                     <h1 className="text-3xl font-bold text-gray-800 mb-6">Lịch sử Xuất/Nhập kho</h1>
-                     <input type="text" placeholder="Tìm kiếm theo tên phụ tùng, mã giao dịch, ghi chú..." value={historySearchTerm} onChange={e => setHistorySearchTerm(e.target.value)} className="w-full p-3 border rounded-lg mb-6 text-gray-900"/>
-                     <div className="bg-white p-6 rounded-lg shadow-md overflow-x-auto">
-                        <table className="w-full text-left min-w-max">
-                            <thead><tr className="bg-gray-50 border-b"><th className="p-3 font-semibold text-gray-700">Ngày</th><th className="p-3 font-semibold text-gray-700">Loại</th><th className="p-3 font-semibold text-gray-700">Phụ tùng</th><th className="p-3 font-semibold text-gray-700">Số lượng</th><th className="p-3 font-semibold text-gray-700">Đơn giá</th><th className="p-3 font-semibold text-gray-700">Tổng tiền</th><th className="p-3 font-semibold text-gray-700">Chi nhánh</th><th className="p-3 font-semibold text-gray-700">Ghi chú</th></tr></thead>
-                            <tbody>
-                                {filteredTransactions.map(tx => (
-                                    <tr key={tx.id} className="border-b hover:bg-gray-50">
-                                        <td className="p-3 text-gray-700">{tx.date}</td>
-                                        <td className="p-3"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${tx.type === 'Nhập kho' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{tx.type}</span></td>
-                                        <td className="p-3 font-medium text-gray-900">{tx.partName}</td>
-                                        <td className="p-3 text-gray-800">{tx.quantity}</td>
-                                        <td className="p-3 text-gray-800">{formatCurrency(tx.unitPrice || 0)}</td>
-                                        <td className="p-3 text-gray-900 font-semibold">{formatCurrency(tx.totalPrice || 0)}</td>
-                                        <td className="p-3 text-gray-700">{storeSettings.branches.find(b => b.id === tx.branchId)?.name || tx.branchId}</td>
-                                        <td className="p-3 text-sm text-gray-600">{tx.notes}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                        {filteredTransactions.length === 0 && <p className="text-center py-8 text-gray-500">Không tìm thấy giao dịch nào.</p>}
-                    </div>
-                </div>
-            )}
+            {totalPages > 1 && <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} itemsPerPage={ITEMS_PER_PAGE} totalItems={filteredParts.length} />}
         </div>
     );
 };
