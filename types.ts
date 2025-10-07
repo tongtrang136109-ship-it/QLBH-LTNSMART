@@ -88,8 +88,7 @@ export interface WorkOrder {
   processingType?: string;
   customerQuote?: number;
   discount?: number;
-  odometerReading?: number;
-  serviceTypes?: string[];
+  mileage?: number;
 }
 
 export interface Customer {
@@ -99,8 +98,6 @@ export interface Customer {
   vehicle: string;
   licensePlate: string;
   loyaltyPoints: number;
-  lastServiceOdometer?: number;
-  lastServiceDate?: string;
 }
 
 export interface InventoryTransaction {
