@@ -1092,107 +1092,148 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
         reader.readAsText(file, 'UTF-8');
         event.target.value = ''; // Reset file input to allow re-uploading the same file
     };
+
+    const generateSkuFromName = (name: string): string => {
+        if (!name || name.trim() === '') return '';
+
+        const cleanedName = name
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/đ/g, "d").replace(/Đ/g, "D")
+            .replace(/[^a-zA-Z0-9\s]/g, '')
+            .trim()
+            .toUpperCase();
+
+        const words = cleanedName.split(/\s+/).filter(Boolean);
+        if (words.length === 0) return '';
+        
+        const initials = words.slice(0, 3).map(word => word[0]).join('');
+        const randomPart = Math.floor(1000 + Math.random() * 9000);
+
+        return `${initials}-${randomPart}`;
+    };
     
     const parseCSVAndImport = (csvText: string) => {
         try {
-            const lines = csvText.trim().split('\n');
-            const headerRow = lines[0];
-
-            if (!headerRow.toLowerCase().includes('danh mục sản phẩm') || !headerRow.toLowerCase().includes('đơn giá nhập')) {
-                 alert('Tệp không đúng định dạng. Cột tiêu đề phải chứa "Danh mục sản phẩm" và "Đơn giá nhập".');
-                 return;
+            const lines = csvText.trim().split('\n').map(line => line.trim()).filter(Boolean);
+            if (lines.length < 2) {
+                alert("Tệp CSV trống hoặc chỉ có dòng tiêu đề.");
+                return;
             }
 
-            const rows = lines.slice(1);
+            const header = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
+            
+            const headerMap = {
+                name: header.findIndex(h => h.includes('tên')),
+                sku: header.findIndex(h => h.includes('mã sp') || h.includes('sku')),
+                category: header.findIndex(h => h.includes('danh mục')),
+                price: header.findIndex(h => h.includes('giá nhập')),
+                sellingPrice: header.findIndex(h => h.includes('giá bán')),
+                stock: header.findIndex(h => h.includes('tồn kho')),
+            };
+
+            if (headerMap.name === -1 || headerMap.price === -1 || headerMap.sellingPrice === -1 || headerMap.stock === -1) {
+                alert('Tệp CSV phải chứa các cột: Tên, Giá nhập, Giá bán, Tồn kho.');
+                return;
+            }
 
             let addedCount = 0;
             let updatedCount = 0;
             let skippedCount = 0;
-            
+
             let updatedPartsList = [...parts];
+            let newCategories = new Set<string>(allCategories);
             const newTransactions: InventoryTransaction[] = [];
 
+            const rows = lines.slice(1);
+
             rows.forEach((rowStr, index) => {
-                // Basic CSV parser to handle comma-separated values, stripping quotes
-                const row = rowStr.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                const row = rowStr.split(',').map(v => v.trim().replace(/"/g, ''));
                 
-                if (row.length < 6) {
+                const name = row[headerMap.name];
+                const sku = headerMap.sku !== -1 ? row[headerMap.sku] : null;
+                const category = (headerMap.category !== -1 ? row[headerMap.category] : 'Chưa phân loại') || 'Chưa phân loại';
+                
+                const parseCurrency = (val: string) => val ? parseFloat(val.replace(/\./g, '').replace(/,/g, '.')) : NaN;
+                
+                const price = parseCurrency(row[headerMap.price]);
+                const sellingPrice = parseCurrency(row[headerMap.sellingPrice]);
+                const stock = parseInt(row[headerMap.stock], 10);
+
+                if (!name || isNaN(price) || isNaN(sellingPrice) || isNaN(stock)) {
                     skippedCount++;
+                    console.warn(`Bỏ qua dòng ${index + 2}: Dữ liệu không hợp lệ.`);
                     return;
                 }
-                
-                const name = row[1]?.trim();
-                const priceStr = row[2]?.trim();
-                const sellingPriceStr = row[3]?.trim();
-                const stockStr = row[5]?.trim();
 
-                if (!name || !priceStr || !sellingPriceStr || stockStr === undefined) {
-                    skippedCount++;
-                    return;
+                if (category) {
+                    newCategories.add(category);
                 }
 
-                const price = parseFloat(priceStr.replace(/\./g, ''));
-                const sellingPrice = parseFloat(sellingPriceStr.replace(/\./g, ''));
-                const stock = parseInt(stockStr, 10) || 0;
+                const existingPartIndex = updatedPartsList.findIndex(p => 
+                    (sku && p.sku && p.sku.trim().toLowerCase() === sku.trim().toLowerCase()) || 
+                    p.name.trim().toLowerCase() === name.trim().toLowerCase()
+                );
 
-                if (isNaN(price) || isNaN(sellingPrice)) {
-                     skippedCount++;
-                     return;
-                }
+                let partForTransaction: Part;
 
-                const existingPartIndex = updatedPartsList.findIndex(p => p.name === name);
-                
-                let partIdForTransaction: string;
-
-                if (existingPartIndex > -1) { // Part exists, update it
+                if (existingPartIndex > -1) {
                     const existingPart = updatedPartsList[existingPartIndex];
-                    const updatedPart = {
+                    const updatedPart: Part = {
                         ...existingPart,
                         price,
                         sellingPrice,
+                        category: category || existingPart.category,
                         stock: {
                             ...existingPart.stock,
                             [currentBranchId]: (existingPart.stock[currentBranchId] || 0) + stock,
                         }
                     };
                     updatedPartsList[existingPartIndex] = updatedPart;
-                    partIdForTransaction = existingPart.id;
+                    partForTransaction = updatedPart;
                     updatedCount++;
-                } else { // New part
-                    const newPartId = `P${Date.now()}-${index}`;
-                    partIdForTransaction = newPartId;
-                    const firstWord = name.split(' ')[0] || `SKU${index}`;
-                    const sku = updatedPartsList.some(p => p.sku === firstWord) ? `${firstWord}-${Date.now()}` : firstWord;
-
+                } else {
                     const newPart: Part = {
-                        id: newPartId, name, sku, price, sellingPrice,
+                        id: `P${Date.now()}-${index}`,
+                        name,
+                        sku: sku || generateSkuFromName(name),
+                        price,
+                        sellingPrice,
+                        category,
                         stock: { [currentBranchId]: stock },
-                        category: 'Chưa phân loại'
                     };
                     updatedPartsList.push(newPart);
+                    partForTransaction = newPart;
                     addedCount++;
                 }
-
+                
                 if (stock > 0) {
                      newTransactions.push({
-                        id: `T-IMP-${Date.now()}-${index}`, type: 'Nhập kho', partId: partIdForTransaction,
-                        partName: name, quantity: stock, date: new Date().toISOString().split('T')[0],
-                        notes: 'Nhập kho từ tệp CSV', unitPrice: price, totalPrice: price * stock,
+                        id: `T-CSV-${Date.now()}-${index}`,
+                        type: 'Nhập kho',
+                        partId: partForTransaction.id,
+                        partName: partForTransaction.name,
+                        quantity: stock,
+                        date: new Date().toISOString().split('T')[0],
+                        notes: 'Nhập kho từ tệp CSV',
+                        unitPrice: price,
+                        totalPrice: price * stock,
                         branchId: currentBranchId,
+                        userId: currentUser.id,
+                        userName: currentUser.name,
                     });
                 }
             });
 
-            // Batch update state
             setParts(updatedPartsList);
-            
+            setAllCategories(Array.from(newCategories).sort());
             if (newTransactions.length > 0) {
                  setTransactions(prev => [...newTransactions, ...prev]);
             }
             
-            let message = `Nhập tệp thành công! ${addedCount} sản phẩm mới, ${updatedCount} sản phẩm được cập nhật.`;
+            let message = `Nhập tệp thành công!\n- ${addedCount} sản phẩm mới được thêm.\n- ${updatedCount} sản phẩm hiện có được cập nhật.`;
             if (skippedCount > 0) {
-                message += ` Đã bỏ qua ${skippedCount} dòng do lỗi dữ liệu.`
+                message += `\n- Đã bỏ qua ${skippedCount} dòng do dữ liệu không hợp lệ.`
             }
             alert(message);
         } catch (error) {
