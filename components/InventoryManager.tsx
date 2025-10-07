@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import type { Part, InventoryTransaction, User, StoreSettings } from '../types';
-import { PlusIcon, PencilSquareIcon, ArchiveBoxIcon, DocumentTextIcon, MinusIcon, TrashIcon, EllipsisVerticalIcon, ExclamationTriangleIcon, Cog6ToothIcon, ArrowsRightLeftIcon, BanknotesIcon, ChevronDownIcon, CloudArrowUpIcon, ArrowUturnLeftIcon, ClockIcon, Squares2X2Icon } from './common/Icons';
+import { PlusIcon, PencilSquareIcon, ArchiveBoxIcon, DocumentTextIcon, MinusIcon, TrashIcon, EllipsisVerticalIcon, ExclamationTriangleIcon, Cog6ToothIcon, ArrowsRightLeftIcon, BanknotesIcon, ChevronDownIcon, CloudArrowUpIcon, ArrowUturnLeftIcon, ClockIcon, Squares2X2Icon, ArrowDownTrayIcon } from './common/Icons';
 import Pagination from './common/Pagination';
 
 // Helper to format currency
@@ -149,6 +149,7 @@ const hondaPartsData: (Omit<Part, 'id' | 'stock'> & { model: string[] })[] = [
 
 const LOOKUP_ITEMS_PER_PAGE = 50;
 const INVENTORY_ITEMS_PER_PAGE = 15;
+const CATALOG_ITEMS_PER_PAGE = 12;
 const HISTORY_ITEMS_PER_PAGE = 25;
 
 // --- Modals (re-using from previous implementation, ensure they are here and correct) ---
@@ -754,6 +755,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [selectedPart, setSelectedPart] = useState<Part | null>(null);
     const [activeActionMenu, setActiveActionMenu] = useState<string | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -921,8 +923,8 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
     }, [parts, catalogSearch, catalogCategoryFilter]);
 
     const paginatedCatalogParts = useMemo(() => {
-        const startIndex = (catalogPage - 1) * 20; // 20 items per page for grid view
-        return filteredCatalogParts.slice(startIndex, startIndex + 20);
+        const startIndex = (catalogPage - 1) * CATALOG_ITEMS_PER_PAGE;
+        return filteredCatalogParts.slice(startIndex, startIndex + CATALOG_ITEMS_PER_PAGE);
     }, [filteredCatalogParts, catalogPage]);
     
     const filteredLookupParts = useMemo(() => {
@@ -966,6 +968,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
              <HistoryModal part={selectedPart} transactions={transactions} onClose={() => { setIsHistoryModalOpen(false); setSelectedPart(null); }} storeSettings={storeSettings} />
              <TransferStockModal isOpen={isTransferModalOpen} onClose={() => setIsTransferModalOpen(false)} onSave={handleSaveTransfer} parts={parts} branches={storeSettings.branches} currentBranchId={currentBranchId} />
              <CategorySettingsModal isOpen={isCategoryModalOpen} onClose={() => setIsCategoryModalOpen(false)} categories={allCategories} onAdd={(name) => handleCategoryAction('add', { name })} onEdit={(oldName, newName) => handleCategoryAction('edit', { oldName, newName })} onDelete={(name) => handleCategoryAction('delete', { name })} />
+             <UploadModal isOpen={isUploadModalOpen} onClose={() => setIsUploadModalOpen(false)} setParts={setParts} currentBranchId={currentBranchId} />
 
             {/* Header and Actions (now conditional per tab) */}
             {activeTab === 'inventory' && (
@@ -981,7 +984,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
                      <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Danh mục sản phẩm</h1>
                      <div className="flex items-center gap-2">
                         <button onClick={() => setIsCategoryModalOpen(true)} className="p-2.5 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600" title="Cài đặt danh mục"><Cog6ToothIcon className="w-5 h-5 text-slate-700 dark:text-slate-200"/></button>
-                        <button className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-slate-200 dark:hover:bg-slate-600 text-sm" title="Chức năng đang phát triển"><CloudArrowUpIcon/> Tải lên</button>
+                        <button onClick={() => setIsUploadModalOpen(true)} className="flex items-center gap-2 bg-green-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-green-700 text-sm"><CloudArrowUpIcon/> Tải lên</button>
                         <button onClick={() => { setSelectedPart(null); setIsPartModalOpen(true); }} className="flex items-center gap-2 bg-sky-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-sky-700 text-sm"><PlusIcon/> Thêm Phụ tùng</button>
                      </div>
                 </div>
@@ -1081,33 +1084,39 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
                         </select>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                         {paginatedCatalogParts.map(part => (
-                            <div key={part.id} className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 p-4 space-y-2 relative">
-                                <div className="absolute top-2 right-2">
-                                     <EllipsisVerticalIcon className="w-5 h-5 text-slate-400"/>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <ArchiveBoxIcon className="w-6 h-6 text-slate-500 dark:text-slate-400"/>
+                         {paginatedCatalogParts.map(part => {
+                             const cardColor = getCategoryColor(part.category);
+                             const totalStock = Object.values(part.stock).reduce((a, b) => a + b, 0);
+                             return (
+                                <div key={part.id} className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 relative border-t-4 overflow-hidden ${cardColor}`}>
+                                    <div className="p-4 space-y-2">
+                                        <div className="absolute top-2 right-2">
+                                            <EllipsisVerticalIcon className="w-5 h-5 text-slate-400"/>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                <ArchiveBoxIcon className="w-6 h-6 text-slate-500 dark:text-slate-400"/>
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-slate-800 dark:text-slate-200 leading-tight">{part.name}</p>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">{part.sku}</p>
+                                            </div>
+                                        </div>
+                                        <button className="text-xs font-semibold text-sky-700 bg-sky-100 dark:text-sky-300 dark:bg-sky-900/50 px-2 py-0.5 rounded-full">{part.category || 'Chưa phân loại'}</button>
+                                        <div className="grid grid-cols-2 gap-x-4 border-t pt-2 dark:border-slate-700">
+                                            <div className="text-sm"><p className="text-slate-500 dark:text-slate-400">Giá nhập:</p><p className="font-medium text-slate-700 dark:text-slate-300">{formatCurrency(part.price)}</p></div>
+                                            <div className="text-sm text-right"><p className="text-slate-500 dark:text-slate-400">Giá bán:</p><p className="font-bold text-sky-600 dark:text-sky-400">{formatCurrency(part.sellingPrice)}</p></div>
+                                        </div>
+                                        {totalStock <= 5 && (
+                                            <p className="text-xs font-bold text-red-500 dark:text-red-400 flex items-center gap-1"><ExclamationTriangleIcon className="w-4 h-4"/> Tồn kho thấp: {totalStock}</p>
+                                        )}
                                     </div>
-                                    <div>
-                                        <p className="font-semibold text-slate-800 dark:text-slate-200 leading-tight">{part.name}</p>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">{part.sku}</p>
-                                    </div>
                                 </div>
-                                <button className="text-xs font-semibold text-sky-700 bg-sky-100 dark:text-sky-300 dark:bg-sky-900/50 px-2 py-0.5 rounded-full">{part.category || 'Chưa phân loại'}</button>
-                                <div className="grid grid-cols-2 gap-x-4 border-t pt-2 dark:border-slate-700">
-                                    <div className="text-sm"><p className="text-slate-500 dark:text-slate-400">Giá nhập:</p><p className="font-medium text-slate-700 dark:text-slate-300">{formatCurrency(part.price)}</p></div>
-                                    <div className="text-sm text-right"><p className="text-slate-500 dark:text-slate-400">Giá bán:</p><p className="font-bold text-sky-600 dark:text-sky-400">{formatCurrency(part.sellingPrice)}</p></div>
-                                </div>
-                                {Object.values(part.stock).reduce((a, b) => a + b, 0) <= 5 && (
-                                     <p className="text-xs font-bold text-red-500 dark:text-red-400 flex items-center gap-1"><ExclamationTriangleIcon className="w-4 h-4"/> Tồn kho thấp: {Object.values(part.stock).reduce((a, b) => a + b, 0)}</p>
-                                )}
-                            </div>
-                        ))}
+                            )
+                        })}
                     </div>
                      {paginatedCatalogParts.length === 0 && <p className="text-center p-8 text-slate-500 dark:text-slate-400">Không tìm thấy phụ tùng nào.</p>}
-                     {filteredCatalogParts.length > 20 && <Pagination currentPage={catalogPage} totalPages={Math.ceil(filteredCatalogParts.length / 20)} onPageChange={setCatalogPage} itemsPerPage={20} totalItems={filteredCatalogParts.length}/>}
+                     {filteredCatalogParts.length > CATALOG_ITEMS_PER_PAGE && <Pagination currentPage={catalogPage} totalPages={Math.ceil(filteredCatalogParts.length / CATALOG_ITEMS_PER_PAGE)} onPageChange={setCatalogPage} itemsPerPage={CATALOG_ITEMS_PER_PAGE} totalItems={filteredCatalogParts.length}/>}
                 </div>
             )}
 
