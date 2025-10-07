@@ -750,6 +750,9 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
     const [lookupSearchTerm, setLookupSearchTerm] = useState('');
     const [lookupCurrentPage, setLookupCurrentPage] = useState(1);
     const LOOKUP_ITEMS_PER_PAGE = 20;
+    
+    // State for bulk actions
+    const [selectedPartIds, setSelectedPartIds] = useState<string[]>([]);
 
     const motorcycleModels = useMemo(() => {
         const models = new Set<string>();
@@ -759,6 +762,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
 
     useEffect(() => {
         setInventoryCurrentPage(1);
+        setSelectedPartIds([]);
     }, [inventorySearchTerm, inventoryStatusFilter, inventoryCategoryFilter]);
 
     useEffect(() => {
@@ -813,6 +817,22 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
             setParts(prev => prev.filter(p => p.id !== partId));
         }
         setOpenMenuId(null);
+    };
+    
+    const handleToggleSelect = (partId: string) => {
+        setSelectedPartIds(prev =>
+            prev.includes(partId)
+                ? prev.filter(id => id !== partId)
+                : [...prev, partId]
+        );
+    };
+
+    const handleDeleteSelected = () => {
+        if (selectedPartIds.length === 0) return;
+        if (window.confirm(`Bạn có chắc chắn muốn xóa ${selectedPartIds.length} phụ tùng đã chọn không? Hành động này không thể hoàn tác.`)) {
+            setParts(prev => prev.filter(p => !selectedPartIds.includes(p.id)));
+            setSelectedPartIds([]); // Clear selection after deletion
+        }
     };
 
     const handleAddCategory = (newCategory: string) => {
@@ -1044,6 +1064,14 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [openMenuId]);
+    
+    const handleToggleSelectAll = () => {
+        if (selectedPartIds.length === paginatedInventoryParts.length) {
+            setSelectedPartIds([]);
+        } else {
+            setSelectedPartIds(paginatedInventoryParts.map(p => p.id));
+        }
+    };
 
     // --- CSV Upload Logic ---
     const handleUploadClick = () => {
@@ -1200,53 +1228,64 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
             
             {activeTab === 'inventory' && (
                 <div>
-                     <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-6 gap-4">
-                        {/* Filters on the left */}
-                        <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto lg:flex-grow">
-                             <input
-                                type="text"
-                                placeholder="Tìm kiếm theo tên hoặc SKU..."
-                                value={inventorySearchTerm}
-                                onChange={e => setInventorySearchTerm(e.target.value)}
-                                className="w-full sm:flex-1 p-3 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800"
-                            />
-                            <select
-                                value={inventoryStatusFilter}
-                                onChange={e => setInventoryStatusFilter(e.target.value)}
-                                className="w-full sm:w-auto p-3 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800"
-                            >
-                                <option value="all">Tất cả trạng thái</option>
-                                <option value="in-stock">Còn hàng</option>
-                                <option value="out-of-stock">Hết hàng</option>
-                                <option value="low-stock">Dưới định mức tồn</option>
-                                <option value="slow-moving">Tồn kho quá 60 ngày</option>
-                            </select>
-                            <select
-                                value={inventoryCategoryFilter}
-                                onChange={e => setInventoryCategoryFilter(e.target.value)}
-                                className="w-full sm:w-auto p-3 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800"
-                            >
-                                <option value="all">Tất cả danh mục</option>
-                                {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                            </select>
+                     {selectedPartIds.length > 0 ? (
+                        <div className="flex justify-between items-center mb-6 p-4 bg-sky-100 dark:bg-sky-900/50 rounded-lg">
+                            <span className="font-semibold text-sky-800 dark:text-sky-200">{selectedPartIds.length} mục đã được chọn</span>
+                            <button onClick={handleDeleteSelected} className="flex items-center bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-red-700">
+                                <TrashIcon className="w-5 h-5" />
+                                <span className="ml-2">Xóa mục đã chọn</span>
+                            </button>
                         </div>
+                    ) : (
+                        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-6 gap-4">
+                            {/* Filters on the left */}
+                            <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto lg:flex-grow">
+                                <input
+                                    type="text"
+                                    placeholder="Tìm kiếm theo tên hoặc SKU..."
+                                    value={inventorySearchTerm}
+                                    onChange={e => setInventorySearchTerm(e.target.value)}
+                                    className="w-full sm:flex-1 p-3 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800"
+                                />
+                                <select
+                                    value={inventoryStatusFilter}
+                                    onChange={e => setInventoryStatusFilter(e.target.value)}
+                                    className="w-full sm:w-auto p-3 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800"
+                                >
+                                    <option value="all">Tất cả trạng thái</option>
+                                    <option value="in-stock">Còn hàng</option>
+                                    <option value="out-of-stock">Hết hàng</option>
+                                    <option value="low-stock">Dưới định mức tồn</option>
+                                    <option value="slow-moving">Tồn kho quá 60 ngày</option>
+                                </select>
+                                <select
+                                    value={inventoryCategoryFilter}
+                                    onChange={e => setInventoryCategoryFilter(e.target.value)}
+                                    className="w-full sm:w-auto p-3 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800"
+                                >
+                                    <option value="all">Tất cả danh mục</option>
+                                    {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                </select>
+                            </div>
 
-                        {/* Buttons on the right */}
-                        <div className="flex flex-wrap gap-2 justify-end w-full lg:w-auto lg:flex-shrink-0">
-                            <Link to="/inventory/goods-receipt/new" className="flex items-center bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-green-700">
-                                <PlusIcon /> <span className="ml-2 hidden sm:inline">Tạo phiếu nhập</span>
-                            </Link>
-                            <button onClick={() => setIsExportModalOpen(true)} className="flex items-center bg-red-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-red-600">
-                                <MinusIcon /> <span className="ml-2 hidden sm:inline">Xuất Kho</span>
-                            </button>
-                             <button onClick={() => setIsTransferModalOpen(true)} className="flex items-center bg-orange-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-orange-600">
-                                <ArrowsRightLeftIcon className="w-5 h-5" /> <span className="ml-2 hidden sm:inline">Chuyển kho</span>
-                            </button>
-                            <button onClick={() => handleOpenPartModal()} className="flex items-center bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-sky-700">
-                                <PlusIcon /> <span className="ml-2 hidden sm:inline">Thêm Mới</span>
-                            </button>
+                            {/* Buttons on the right */}
+                            <div className="flex flex-wrap gap-2 justify-end w-full lg:w-auto lg:flex-shrink-0">
+                                <Link to="/inventory/goods-receipt/new" className="flex items-center bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-green-700">
+                                    <PlusIcon /> <span className="ml-2 hidden sm:inline">Tạo phiếu nhập</span>
+                                </Link>
+                                <button onClick={() => setIsExportModalOpen(true)} className="flex items-center bg-red-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-red-600">
+                                    <MinusIcon /> <span className="ml-2 hidden sm:inline">Xuất Kho</span>
+                                </button>
+                                <button onClick={() => setIsTransferModalOpen(true)} className="flex items-center bg-orange-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-orange-600">
+                                    <ArrowsRightLeftIcon className="w-5 h-5" /> <span className="ml-2 hidden sm:inline">Chuyển kho</span>
+                                </button>
+                                <button onClick={() => handleOpenPartModal()} className="flex items-center bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-sky-700">
+                                    <PlusIcon /> <span className="ml-2 hidden sm:inline">Thêm Mới</span>
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    )}
+
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                         <div className="bg-white dark:bg-slate-800 p-5 rounded-lg shadow-md flex items-center border dark:border-slate-700">
@@ -1265,32 +1304,44 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
                                 {paginatedInventoryParts.map(p => {
                                     const stockInBranch = p.stock?.[currentBranchId] ?? 0;
                                     const totalStock = Object.values(p.stock || {}).reduce((a: number, b: number) => a + b, 0);
+                                    const isSelected = selectedPartIds.includes(p.id);
                                     return (
-                                        <div key={p.id} className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-md border border-slate-200 dark:border-slate-700">
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                    <p className="font-bold text-slate-800 dark:text-slate-100 flex items-center">{p.name} {stockInBranch > 0 && stockInBranch < 5 && <ExclamationTriangleIcon className="w-5 h-5 text-red-500 ml-2" />}</p>
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{p.sku}</p>
-                                            </div>
-                                            <div className="flex items-center space-x-2">
-                                                <button onClick={() => handleOpenPartModal(p)} className="text-sky-600 dark:text-sky-400 p-1"><PencilSquareIcon className="w-5 h-5"/></button>
-                                                <button onClick={() => handleDeletePart(p.id)} className="text-red-600 p-1"><TrashIcon className="w-5 h-5"/></button>
-                                            </div>
-                                        </div>
-                                        <div className="mt-4 flex justify-between items-center text-sm">
-                                            <div className="text-center">
-                                                <p className="text-slate-500 dark:text-slate-400">Tồn kho</p>
-                                                <p className={`font-bold text-lg ${stockInBranch < 5 ? 'text-red-600' : 'text-sky-600 dark:text-sky-400'}`}>{stockInBranch}</p>
-                                                <p className="text-xs text-slate-400 dark:text-slate-500">Tổng: {totalStock}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-slate-500 dark:text-slate-400 text-right">Giá nhập</p>
-                                                <p className="font-semibold text-slate-800 dark:text-slate-100 text-right">{formatCurrency(p.price)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-slate-500 dark:text-slate-400 text-right">Giá bán</p>
-                                                <p className="font-bold text-slate-900 dark:text-slate-50 text-right">{formatCurrency(p.sellingPrice)}</p>
-                                            </div>
+                                        <div key={p.id} onClick={() => handleToggleSelect(p.id)} className={`bg-white dark:bg-slate-800 rounded-lg shadow-md border cursor-pointer transition-all duration-200 ${isSelected ? 'border-sky-500 ring-2 ring-sky-500/50' : 'border-slate-200 dark:border-slate-700'}`}>
+                                            <div className="p-4">
+                                                <div className="flex justify-between items-start">
+                                                    <div className="flex items-start space-x-4 flex-1 min-w-0">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="h-5 w-5 rounded border-gray-300 text-sky-600 focus:ring-sky-500 mt-1 flex-shrink-0"
+                                                            checked={isSelected}
+                                                            readOnly
+                                                            onClick={(e) => { e.stopPropagation(); handleToggleSelect(p.id); }}
+                                                        />
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="font-bold text-slate-800 dark:text-slate-100 flex items-center truncate">{p.name} {stockInBranch > 0 && stockInBranch < 5 && <ExclamationTriangleIcon className="w-5 h-5 text-red-500 ml-2 flex-shrink-0" />}</p>
+                                                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{p.sku}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center space-x-2" onClick={e => e.stopPropagation()}>
+                                                        <button onClick={() => handleOpenPartModal(p)} className="text-sky-600 dark:text-sky-400 p-1"><PencilSquareIcon className="w-5 h-5"/></button>
+                                                        <button onClick={() => handleDeletePart(p.id)} className="text-red-600 p-1"><TrashIcon className="w-5 h-5"/></button>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-4 flex justify-between items-center text-sm pl-9">
+                                                    <div className="text-center">
+                                                        <p className="text-slate-500 dark:text-slate-400">Tồn kho</p>
+                                                        <p className={`font-bold text-lg ${stockInBranch < 5 ? 'text-red-600' : 'text-sky-600 dark:text-sky-400'}`}>{stockInBranch}</p>
+                                                        <p className="text-xs text-slate-400 dark:text-slate-500">Tổng: {totalStock}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-slate-500 dark:text-slate-400 text-right">Giá nhập</p>
+                                                        <p className="font-semibold text-slate-800 dark:text-slate-100 text-right">{formatCurrency(p.price)}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-slate-500 dark:text-slate-400 text-right">Giá bán</p>
+                                                        <p className="font-bold text-slate-900 dark:text-slate-50 text-right">{formatCurrency(p.sellingPrice)}</p>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     )
@@ -1299,13 +1350,34 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
 
                             <div className="hidden lg:block bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md overflow-x-auto">
                                 <table className="w-full text-left min-w-max">
-                                    <thead><tr className="bg-slate-50 dark:bg-slate-700/50 border-b dark:border-slate-700"><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Tên Phụ tùng</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">SKU</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Tồn kho (hiện tại)</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Tổng tồn kho</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Giá nhập</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Giá bán</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Hành động</th></tr></thead>
+                                    <thead>
+                                        <tr className="bg-slate-50 dark:bg-slate-700/50 border-b dark:border-slate-700">
+                                            <th className="p-3">
+                                                <input
+                                                    type="checkbox"
+                                                    className="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+                                                    ref={el => { if (el) el.indeterminate = selectedPartIds.length > 0 && selectedPartIds.length < paginatedInventoryParts.length; }}
+                                                    checked={paginatedInventoryParts.length > 0 && selectedPartIds.length === paginatedInventoryParts.length}
+                                                    onChange={handleToggleSelectAll}
+                                                />
+                                            </th>
+                                            <th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Tên Phụ tùng</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">SKU</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Tồn kho (hiện tại)</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Tổng tồn kho</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Giá nhập</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Giá bán</th><th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Hành động</th>
+                                        </tr>
+                                    </thead>
                                     <tbody>
                                         {paginatedInventoryParts.map(p => {
                                             const stockInBranch = p.stock?.[currentBranchId] ?? 0;
                                             const totalStock = Object.values(p.stock || {}).reduce((a: number, b: number) => a + b, 0);
                                             return (
                                             <tr key={p.id} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                                <td className="p-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+                                                        checked={selectedPartIds.includes(p.id)}
+                                                        onChange={() => handleToggleSelect(p.id)}
+                                                    />
+                                                </td>
                                                 <td className="p-3 font-semibold text-slate-900 dark:text-slate-100"><div className="flex items-center space-x-2"><span>{p.name}</span>{stockInBranch > 0 && stockInBranch < 5 && (<ExclamationTriangleIcon className="w-5 h-5 text-red-500" title={`Tồn kho thấp: ${stockInBranch}`} />)}</div></td>
                                                 <td className="p-3 text-slate-600 dark:text-slate-300">{p.sku}</td>
                                                 <td className={`p-3 font-medium ${stockInBranch < 5 ? 'text-red-600 font-bold' : 'text-slate-900 dark:text-slate-100'}`}>{stockInBranch}</td>
