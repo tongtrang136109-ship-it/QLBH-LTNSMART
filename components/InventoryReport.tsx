@@ -230,11 +230,13 @@ const InventoryReport: React.FC<InventoryReportProps> = ({ parts, transactions, 
                                             <span className="font-medium">Hết hạn vào: {part.expiryDate}</span>
                                         </div>
                                     )}
-                                    {activeTab === 'slow-moving' && part.daysSinceLastSale !== undefined && (
+                                    {/* FIX: Cast part to ReportPart to access daysSinceLastSale */}
+                                    {activeTab === 'slow-moving' && (part as ReportPart).daysSinceLastSale !== undefined && (
                                          <div className="flex items-center text-sm">
                                              <ClockIcon className="w-4 h-4 mr-2 text-sky-600 dark:text-sky-400"/>
                                              <span className="text-slate-600 dark:text-slate-300">Chưa bán trong: </span>
-                                             <span className="font-bold text-sky-600 dark:text-sky-400 ml-1">{part.daysSinceLastSale} ngày</span>
+                                             {/* FIX: Cast part to ReportPart to access daysSinceLastSale */}
+                                             <span className="font-bold text-sky-600 dark:text-sky-400 ml-1">{(part as ReportPart).daysSinceLastSale} ngày</span>
                                         </div>
                                     )}
                                 </div>
@@ -278,8 +280,10 @@ const InventoryReport: React.FC<InventoryReportProps> = ({ parts, transactions, 
                                                 case 'name': return <td key={header.key} className="p-4 text-slate-900 dark:text-slate-100 font-semibold">{part.name}</td>;
                                                 case 'sku': return <td key={header.key} className="p-4 text-slate-600 dark:text-slate-300">{part.sku}</td>;
                                                 case 'expiryDate': return <td key={header.key} className="p-4 text-red-600 dark:text-red-400 font-medium">{part.expiryDate}</td>;
-                                                case 'lastSoldDate': return <td key={header.key} className="p-4 text-slate-700 dark:text-slate-200">{part.lastSoldDate || 'Chưa bán'}</td>;
-                                                case 'daysSinceLastSale': return <td key={header.key} className="p-4 text-sky-600 dark:text-sky-400 font-medium">{part.daysSinceLastSale}</td>;
+                                                {/* FIX: Cast part to ReportPart to access lastSoldDate */}
+                                                case 'lastSoldDate': return <td key={header.key} className="p-4 text-slate-700 dark:text-slate-200">{(part as ReportPart).lastSoldDate || 'Chưa bán'}</td>;
+                                                {/* FIX: Cast part to ReportPart to access daysSinceLastSale */}
+                                                case 'daysSinceLastSale': return <td key={header.key} className="p-4 text-sky-600 dark:text-sky-400 font-medium">{(part as ReportPart).daysSinceLastSale}</td>;
                                                 default: return <td key={header.key}></td>;
                                             }
                                         })}
