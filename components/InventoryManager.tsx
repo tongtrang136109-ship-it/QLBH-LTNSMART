@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import type { Part, InventoryTransaction, User, StoreSettings } from '../types';
-import { PlusIcon, PencilSquareIcon, ArchiveBoxIcon, DocumentTextIcon, MinusIcon, TrashIcon, EllipsisVerticalIcon, ExclamationTriangleIcon, Cog6ToothIcon, ArrowsRightLeftIcon, BanknotesIcon, ChevronDownIcon, CloudArrowUpIcon, ArrowUturnLeftIcon, ClockIcon } from './common/Icons';
+import { PlusIcon, PencilSquareIcon, ArchiveBoxIcon, DocumentTextIcon, MinusIcon, TrashIcon, EllipsisVerticalIcon, ExclamationTriangleIcon, Cog6ToothIcon, ArrowsRightLeftIcon, BanknotesIcon, ChevronDownIcon, CloudArrowUpIcon, ArrowUturnLeftIcon, ClockIcon, Squares2X2Icon } from './common/Icons';
 import Pagination from './common/Pagination';
 
 // Helper to format currency
@@ -147,10 +147,12 @@ const hondaPartsData: (Omit<Part, 'id' | 'stock'> & { model: string[] })[] = [
     { name: 'Vít 4x20', sku: '93891-040-2007', price: 3000, sellingPrice: 4628, category: 'Linh kiện nhỏ', model: ['Future 125', 'Wave Alpha', 'Dream'] },
 ];
 
-const ITEMS_PER_PAGE = 50;
+const LOOKUP_ITEMS_PER_PAGE = 50;
+const INVENTORY_ITEMS_PER_PAGE = 15;
+const HISTORY_ITEMS_PER_PAGE = 25;
 
-
-// --- Modals ---
+// --- Modals (re-using from previous implementation, ensure they are here and correct) ---
+// PartModal, TransactionModal, HistoryModal, TransferStockModal, CategorySettingsModal
 const PartModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -382,7 +384,6 @@ const PartModal: React.FC<{
     );
 };
 
-// Fix: Add TransactionModal for handling stock import/export
 const TransactionModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -477,7 +478,6 @@ const TransactionModal: React.FC<{
     )
 }
 
-// Fix: Add HistoryModal to view transaction history for a part
 const HistoryModal: React.FC<{
     part: Part | null;
     transactions: InventoryTransaction[];
@@ -743,7 +743,7 @@ interface InventoryManagerProps {
     storeSettings: StoreSettings;
 }
 
-type ActiveTab = 'inventory' | 'catalog' | 'history';
+type ActiveTab = 'inventory' | 'catalog' | 'lookup' | 'history';
 
 const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts, setParts, transactions, setTransactions, currentBranchId, storeSettings }) => {
     // General State
@@ -760,18 +760,21 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
     
     // Tab-specific State
     const [inventorySearch, setInventorySearch] = useState('');
+    const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState('all');
     const [inventoryPage, setInventoryPage] = useState(1);
+    
     const [catalogSearch, setCatalogSearch] = useState('');
+    const [catalogCategoryFilter, setCatalogCategoryFilter] = useState('all');
     const [catalogPage, setCatalogPage] = useState(1);
+
+    const [lookupModelFilter, setLookupModelFilter] = useState('all');
+    const [lookupPage, setLookupPage] = useState(1);
+    
     const [historySearch, setHistorySearch] = useState('');
     const [historyPage, setHistoryPage] = useState(1);
-    
-    const searchGetters: Record<ActiveTab, string> = { inventory: inventorySearch, catalog: catalogSearch, history: historySearch };
-    const searchSetters: Record<ActiveTab, React.Dispatch<React.SetStateAction<string>>> = { inventory: setInventorySearch, catalog: setCatalogSearch, history: setHistorySearch };
-    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => searchSetters[activeTab](e.target.value);
-
 
     const allCategories = useMemo(() => Array.from(new Set(parts.map(p => p.category).filter((c): c is string => !!c))).sort(), [parts]);
+    const allHondaModels = useMemo(() => Array.from(new Set(hondaPartsData.flatMap(p => p.model))).sort(), []);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -782,6 +785,23 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+    
+    useEffect(() => {
+        // Reset page to 1 when filters change
+        setInventoryPage(1);
+    }, [inventorySearch, inventoryCategoryFilter]);
+    
+    useEffect(() => {
+        setCatalogPage(1);
+    }, [catalogSearch, catalogCategoryFilter]);
+    
+    useEffect(() => {
+        setLookupPage(1);
+    }, [lookupModelFilter]);
+
+     useEffect(() => {
+        setHistoryPage(1);
+    }, [historySearch]);
 
     // --- Handlers ---
     const handleSavePart = (part: Part) => {
@@ -797,11 +817,11 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
         }
     };
     
-    const handleSelectPartFromCatalog = (catalogPart: Omit<Part, 'id' | 'stock'>) => {
+    const handleSelectPartFromLookup = (lookupPart: Omit<Part, 'id' | 'stock'>) => {
         const newPartForModal: Part = {
             id: '', // Signal to PartModal that this is a new part
             stock: {},
-            ...catalogPart
+            ...lookupPart
         };
         setSelectedPart(newPartForModal);
         setIsPartModalOpen(true);
@@ -878,6 +898,66 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
         </button>
     );
 
+    // --- Memos for Filtered Data ---
+    const filteredInventoryParts = useMemo(() => {
+        return parts.filter(p => {
+            const searchMatch = p.name.toLowerCase().includes(inventorySearch.toLowerCase()) || p.sku.toLowerCase().includes(inventorySearch.toLowerCase());
+            const categoryMatch = inventoryCategoryFilter === 'all' || p.category === inventoryCategoryFilter;
+            return searchMatch && categoryMatch;
+        });
+    }, [parts, inventorySearch, inventoryCategoryFilter]);
+
+    const paginatedInventoryParts = useMemo(() => {
+        const startIndex = (inventoryPage - 1) * INVENTORY_ITEMS_PER_PAGE;
+        return filteredInventoryParts.slice(startIndex, startIndex + INVENTORY_ITEMS_PER_PAGE);
+    }, [filteredInventoryParts, inventoryPage]);
+    
+    const filteredCatalogParts = useMemo(() => {
+        return parts.filter(p => {
+            const searchMatch = p.name.toLowerCase().includes(catalogSearch.toLowerCase()) || p.sku.toLowerCase().includes(catalogSearch.toLowerCase());
+            const categoryMatch = catalogCategoryFilter === 'all' || p.category === catalogCategoryFilter;
+            return searchMatch && categoryMatch;
+        });
+    }, [parts, catalogSearch, catalogCategoryFilter]);
+
+    const paginatedCatalogParts = useMemo(() => {
+        const startIndex = (catalogPage - 1) * 20; // 20 items per page for grid view
+        return filteredCatalogParts.slice(startIndex, startIndex + 20);
+    }, [filteredCatalogParts, catalogPage]);
+    
+    const filteredLookupParts = useMemo(() => {
+        if (lookupModelFilter === 'all') return hondaPartsData;
+        return hondaPartsData.filter(p => p.model.includes(lookupModelFilter));
+    }, [lookupModelFilter]);
+    
+    const paginatedLookupParts = useMemo(() => {
+         const startIndex = (lookupPage - 1) * LOOKUP_ITEMS_PER_PAGE;
+        return filteredLookupParts.slice(startIndex, startIndex + LOOKUP_ITEMS_PER_PAGE);
+    }, [filteredLookupParts, lookupPage]);
+
+    const filteredHistory = useMemo(() => {
+        return transactions.filter(tx => 
+            tx.partName.toLowerCase().includes(historySearch.toLowerCase()) ||
+            tx.id.toLowerCase().includes(historySearch.toLowerCase()) ||
+            tx.notes.toLowerCase().includes(historySearch.toLowerCase())
+        ).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [transactions, historySearch]);
+    
+     const paginatedHistory = useMemo(() => {
+         const startIndex = (historyPage - 1) * HISTORY_ITEMS_PER_PAGE;
+        return filteredHistory.slice(startIndex, startIndex + HISTORY_ITEMS_PER_PAGE);
+    }, [filteredHistory, historyPage]);
+    
+    const inventorySummary = useMemo(() => {
+        return parts.reduce((acc, part) => {
+            const totalStock = Object.values(part.stock).reduce((sum, count) => sum + count, 0);
+            acc.totalQuantity += totalStock;
+            acc.totalValue += totalStock * part.price;
+            return acc;
+        }, { totalQuantity: 0, totalValue: 0 });
+    }, [parts]);
+
+
     return (
         <div className="space-y-6">
              {/* Modals */}
@@ -887,50 +967,228 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
              <TransferStockModal isOpen={isTransferModalOpen} onClose={() => setIsTransferModalOpen(false)} onSave={handleSaveTransfer} parts={parts} branches={storeSettings.branches} currentBranchId={currentBranchId} />
              <CategorySettingsModal isOpen={isCategoryModalOpen} onClose={() => setIsCategoryModalOpen(false)} categories={allCategories} onAdd={(name) => handleCategoryAction('add', { name })} onEdit={(oldName, newName) => handleCategoryAction('edit', { oldName, newName })} onDelete={(name) => handleCategoryAction('delete', { name })} />
 
-            {/* Header and Actions */}
-            <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700">
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                    <input type="text" placeholder="Tìm kiếm..." value={searchGetters[activeTab]} onChange={handleSearchChange} className="w-full sm:w-72 p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 dark:text-slate-100" />
-                    <div className="flex items-center gap-2 flex-wrap">
-                       {activeTab === 'inventory' && (
-                           <>
-                            <button onClick={() => { setSelectedPart(null); setIsPartModalOpen(true); }} className="flex items-center gap-2 bg-sky-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-sky-700 text-sm"><PlusIcon/> Thêm SP</button>
-                            <Link to="/inventory/goods-receipt/new" className="flex items-center gap-2 bg-green-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-green-700 text-sm"><CloudArrowUpIcon/> Phiếu nhập</Link>
-                            <button onClick={() => { setTransactionType('Xuất kho'); setIsTransactionModalOpen(true); }} className="flex items-center gap-2 bg-red-500 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-red-600 text-sm"><MinusIcon/> Xuất lẻ</button>
-                            <button onClick={() => setIsTransferModalOpen(true)} className="flex items-center gap-2 bg-orange-500 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-orange-600 text-sm"><ArrowsRightLeftIcon/> Chuyển kho</button>
-                           </>
-                       )}
-                        <button onClick={() => setIsCategoryModalOpen(true)} className="p-2.5 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600" title="Cài đặt danh mục"><Cog6ToothIcon className="w-5 h-5 text-slate-700 dark:text-slate-200"/></button>
-                    </div>
+            {/* Header and Actions (now conditional per tab) */}
+            {activeTab === 'inventory' && (
+                <div className="flex flex-col sm:flex-row justify-end sm:items-center gap-2">
+                    <Link to="/inventory/goods-receipt/new" className="flex items-center justify-center gap-2 bg-green-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-green-700 text-sm"><PlusIcon/> Tạo phiếu nhập</Link>
+                    <button onClick={() => { setTransactionType('Xuất kho'); setIsTransactionModalOpen(true); }} className="flex items-center justify-center gap-2 bg-red-500 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-red-600 text-sm"><MinusIcon/> Xuất Kho</button>
+                    <button onClick={() => setIsTransferModalOpen(true)} className="flex items-center justify-center gap-2 bg-orange-500 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-orange-600 text-sm"><ArrowsRightLeftIcon/> Chuyển kho</button>
+                    <button onClick={() => { setSelectedPart(null); setIsPartModalOpen(true); }} className="flex items-center justify-center gap-2 bg-sky-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-sky-700 text-sm"><PlusIcon/> Thêm Mới</button>
                 </div>
-            </div>
-            
+            )}
+            {activeTab === 'catalog' && (
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                     <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Danh mục sản phẩm</h1>
+                     <div className="flex items-center gap-2">
+                        <button onClick={() => setIsCategoryModalOpen(true)} className="p-2.5 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600" title="Cài đặt danh mục"><Cog6ToothIcon className="w-5 h-5 text-slate-700 dark:text-slate-200"/></button>
+                        <button className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-slate-200 dark:hover:bg-slate-600 text-sm" title="Chức năng đang phát triển"><CloudArrowUpIcon/> Tải lên</button>
+                        <button onClick={() => { setSelectedPart(null); setIsPartModalOpen(true); }} className="flex items-center gap-2 bg-sky-600 text-white font-semibold py-2 px-3 rounded-lg shadow-sm hover:bg-sky-700 text-sm"><PlusIcon/> Thêm Phụ tùng</button>
+                     </div>
+                </div>
+            )}
+             
              {/* Tab Navigation */}
             <div className="border-b border-slate-200 dark:border-slate-700">
                 <nav className="-mb-px flex space-x-8" aria-label="Tabs">
                     <TabButton tabId="inventory" icon={<ArchiveBoxIcon className="w-5 h-5" />} label="Tồn kho" />
-                    <TabButton tabId="catalog" icon={<ClockIcon className="w-5 h-5" />} label="Danh mục sản phẩm" />
-                    <TabButton tabId="history" icon={<ArrowsRightLeftIcon className="w-5 h-5" />} label="Lịch sử" />
+                    <TabButton tabId="catalog" icon={<Squares2X2Icon className="w-5 h-5" />} label="Danh mục sản phẩm" />
+                    <TabButton tabId="lookup" icon={<DocumentTextIcon className="w-5 h-5" />} label="Tra cứu Phụ tùng" />
+                    <TabButton tabId="history" icon={<ClockIcon className="w-5 h-5" />} label="Lịch sử" />
                 </nav>
             </div>
             
-            {/* Tab Content */}
+            {/* --- TAB CONTENT --- */}
+
+            {/* 1. TỒN KHO */}
             {activeTab === 'inventory' && (
-                <div>
-                     {/* Existing Inventory List component content */}
+                <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <input type="text" placeholder="Tìm kiếm theo tên hoặc SKU..." value={inventorySearch} onChange={e => setInventorySearch(e.target.value)} className="md:col-span-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 dark:text-slate-100" />
+                        <select value={currentBranchId} disabled className="md:col-span-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-slate-100 dark:bg-slate-800 dark:text-slate-400 cursor-not-allowed">
+                             {storeSettings.branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                         <select value={inventoryCategoryFilter} onChange={e => setInventoryCategoryFilter(e.target.value)} className="md:col-span-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 dark:text-slate-100">
+                             <option value="all">Tất cả danh mục</option>
+                             {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                    </div>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg flex items-center gap-4 border border-blue-200 dark:border-blue-800">
+                            <div className="bg-blue-500 p-3 rounded-full text-white"><ArchiveBoxIcon className="w-6 h-6"/></div>
+                            <div>
+                                <p className="text-sm text-blue-800 dark:text-blue-300">Tổng SL tồn</p>
+                                <p className="text-2xl font-bold text-blue-900 dark:text-blue-200">{inventorySummary.totalQuantity}</p>
+                            </div>
+                        </div>
+                         <div className="bg-green-50 dark:bg-green-900/30 p-4 rounded-lg flex items-center gap-4 border border-green-200 dark:border-green-800">
+                            <div className="bg-green-500 p-3 rounded-full text-white"><BanknotesIcon className="w-6 h-6"/></div>
+                            <div>
+                                <p className="text-sm text-green-800 dark:text-green-300">Giá trị tồn kho</p>
+                                <p className="text-2xl font-bold text-green-900 dark:text-green-200">{formatCurrency(inventorySummary.totalValue)}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 overflow-x-auto">
+                        <table className="w-full text-left">
+                           <thead className="border-b dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 text-sm">
+                                <tr>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Tên Phụ tùng</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">SKU</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-center">Tồn kho (hiện tại)</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-center">Tổng tồn kho</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Giá nhập</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Giá bán</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Hành động</th>
+                                </tr>
+                            </thead>
+                             <tbody>
+                                {paginatedInventoryParts.map(part => {
+                                    const currentStock = part.stock[currentBranchId] || 0;
+                                    const totalStock = Object.values(part.stock).reduce((sum, count) => sum + count, 0);
+                                    return (
+                                     <tr key={part.id} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                                        <td className="p-3 font-medium text-slate-800 dark:text-slate-200">{part.name}</td>
+                                        <td className="p-3 text-slate-500 dark:text-slate-400 font-mono text-xs">{part.sku}</td>
+                                        <td className={`p-3 text-center font-bold ${currentStock <= 3 ? 'text-red-500' : 'text-slate-800 dark:text-slate-200'}`}>{currentStock}</td>
+                                        <td className="p-3 text-center text-slate-600 dark:text-slate-300">{totalStock}</td>
+                                        <td className="p-3 text-right text-slate-600 dark:text-slate-300">{formatCurrency(part.price)}</td>
+                                        <td className="p-3 text-right font-semibold text-sky-600 dark:text-sky-400">{formatCurrency(part.sellingPrice)}</td>
+                                        <td className="p-3">
+                                            <div className="flex items-center gap-3">
+                                                <button onClick={() => { setSelectedPart(part); setIsPartModalOpen(true); }} title="Chỉnh sửa"><PencilSquareIcon className="w-5 h-5 text-sky-600 dark:text-sky-400 hover:opacity-70"/></button>
+                                                <button onClick={() => { setSelectedPart(part); setIsHistoryModalOpen(true); }} title="Lịch sử"><ClockIcon className="w-5 h-5 text-slate-500 hover:opacity-70"/></button>
+                                                <button onClick={() => handleDeletePart(part.id)} title="Xóa"><TrashIcon className="w-5 h-5 text-red-500 hover:opacity-70"/></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )})}
+                            </tbody>
+                        </table>
+                         {paginatedInventoryParts.length === 0 && <p className="text-center p-8 text-slate-500 dark:text-slate-400">Không tìm thấy phụ tùng nào.</p>}
+                    </div>
+                     {filteredInventoryParts.length > INVENTORY_ITEMS_PER_PAGE && <Pagination currentPage={inventoryPage} totalPages={Math.ceil(filteredInventoryParts.length / INVENTORY_ITEMS_PER_PAGE)} onPageChange={setInventoryPage} itemsPerPage={INVENTORY_ITEMS_PER_PAGE} totalItems={filteredInventoryParts.length} />}
                 </div>
             )}
+            
+            {/* 2. DANH MỤC SẢN PHẨM (GRID VIEW) */}
              {activeTab === 'catalog' && (
-                <div>
-                     {/* New Product Catalog component content */}
-                </div>
-            )}
-             {activeTab === 'history' && (
-                <div>
-                     {/* New Transaction History component content */}
+                <div className="space-y-4">
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" placeholder="Tìm kiếm theo tên, SKU..." value={catalogSearch} onChange={e => setCatalogSearch(e.target.value)} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 dark:text-slate-100" />
+                        <select value={catalogCategoryFilter} onChange={e => setCatalogCategoryFilter(e.target.value)} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 dark:text-slate-100">
+                             <option value="all">Tất cả danh mục</option>
+                             {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                         {paginatedCatalogParts.map(part => (
+                            <div key={part.id} className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 p-4 space-y-2 relative">
+                                <div className="absolute top-2 right-2">
+                                     <EllipsisVerticalIcon className="w-5 h-5 text-slate-400"/>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <ArchiveBoxIcon className="w-6 h-6 text-slate-500 dark:text-slate-400"/>
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-slate-800 dark:text-slate-200 leading-tight">{part.name}</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">{part.sku}</p>
+                                    </div>
+                                </div>
+                                <button className="text-xs font-semibold text-sky-700 bg-sky-100 dark:text-sky-300 dark:bg-sky-900/50 px-2 py-0.5 rounded-full">{part.category || 'Chưa phân loại'}</button>
+                                <div className="grid grid-cols-2 gap-x-4 border-t pt-2 dark:border-slate-700">
+                                    <div className="text-sm"><p className="text-slate-500 dark:text-slate-400">Giá nhập:</p><p className="font-medium text-slate-700 dark:text-slate-300">{formatCurrency(part.price)}</p></div>
+                                    <div className="text-sm text-right"><p className="text-slate-500 dark:text-slate-400">Giá bán:</p><p className="font-bold text-sky-600 dark:text-sky-400">{formatCurrency(part.sellingPrice)}</p></div>
+                                </div>
+                                {Object.values(part.stock).reduce((a, b) => a + b, 0) <= 5 && (
+                                     <p className="text-xs font-bold text-red-500 dark:text-red-400 flex items-center gap-1"><ExclamationTriangleIcon className="w-4 h-4"/> Tồn kho thấp: {Object.values(part.stock).reduce((a, b) => a + b, 0)}</p>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                     {paginatedCatalogParts.length === 0 && <p className="text-center p-8 text-slate-500 dark:text-slate-400">Không tìm thấy phụ tùng nào.</p>}
+                     {filteredCatalogParts.length > 20 && <Pagination currentPage={catalogPage} totalPages={Math.ceil(filteredCatalogParts.length / 20)} onPageChange={setCatalogPage} itemsPerPage={20} totalItems={filteredCatalogParts.length}/>}
                 </div>
             )}
 
+            {/* 3. TRA CỨU PHỤ TÙNG */}
+            {activeTab === 'lookup' && (
+                 <div className="space-y-4">
+                    <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Tra cứu phụ tùng Honda Việt Nam</h1>
+                    <div>
+                         <label htmlFor="model-filter" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Chọn dòng xe:</label>
+                         <select id="model-filter" value={lookupModelFilter} onChange={e => setLookupModelFilter(e.target.value)} className="mt-1 w-full md:w-1/2 p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 dark:text-slate-100">
+                            <option value="all">Tất cả</option>
+                            {allHondaModels.map(model => <option key={model} value={model}>{model}</option>)}
+                         </select>
+                    </div>
+                     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="border-b dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 text-sm">
+                                <tr>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Tên Phụ tùng</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Mã (SKU)</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Giá tham khảo</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-center">Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paginatedLookupParts.map(part => (
+                                     <tr key={part.sku} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                                        <td className="p-3 font-medium text-slate-800 dark:text-slate-200">{part.name}</td>
+                                        <td className="p-3 text-slate-500 dark:text-slate-400 font-mono text-xs">{part.sku}</td>
+                                        <td className="p-3 text-right font-semibold text-sky-600 dark:text-sky-400">{formatCurrency(part.sellingPrice)}</td>
+                                        <td className="p-3 text-center">
+                                            <button onClick={() => handleSelectPartFromLookup(part)} className="bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 font-semibold px-3 py-1 rounded-md text-sm hover:bg-sky-200 dark:hover:bg-sky-800/50">Thêm</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                     {filteredLookupParts.length > LOOKUP_ITEMS_PER_PAGE && <Pagination currentPage={lookupPage} totalPages={Math.ceil(filteredLookupParts.length / LOOKUP_ITEMS_PER_PAGE)} onPageChange={setLookupPage} itemsPerPage={LOOKUP_ITEMS_PER_PAGE} totalItems={filteredLookupParts.length} />}
+                 </div>
+            )}
+             
+            {/* 4. LỊCH SỬ */}
+             {activeTab === 'history' && (
+                <div className="space-y-4">
+                    <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Lịch sử Xuất/Nhập kho</h1>
+                    <input type="text" placeholder="Tìm kiếm theo tên phụ tùng, mã giao dịch, ghi chú..." value={historySearch} onChange={e => setHistorySearch(e.target.value)} className="w-full md:w-1/2 p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 dark:text-slate-100" />
+                     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="border-b dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 text-sm">
+                                <tr>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Ngày</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Loại</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Phụ tùng</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-center">Số lượng</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Đơn giá</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Tổng tiền</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Chi nhánh</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Ghi chú</th>
+                                </tr>
+                            </thead>
+                             <tbody>
+                                {paginatedHistory.map(tx => (
+                                     <tr key={tx.id} className="border-b dark:border-slate-700">
+                                        <td className="p-2 text-slate-600 dark:text-slate-400 text-xs">{tx.date}</td>
+                                        <td className="p-2"><span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${tx.type === 'Nhập kho' ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'}`}>{tx.type}</span></td>
+                                        <td className="p-2 font-medium text-slate-800 dark:text-slate-200">{tx.partName}</td>
+                                        <td className="p-2 text-center font-bold text-slate-700 dark:text-slate-300">{tx.quantity}</td>
+                                        <td className="p-2 text-right text-slate-600 dark:text-slate-400">{formatCurrency(tx.unitPrice || 0)}</td>
+                                        <td className="p-2 text-right font-semibold text-slate-800 dark:text-slate-200">{formatCurrency(tx.totalPrice)}</td>
+                                        <td className="p-2 text-slate-600 dark:text-slate-400">{storeSettings.branches.find(b => b.id === tx.branchId)?.name || tx.branchId}</td>
+                                        <td className="p-2 text-slate-500 text-xs">{tx.notes}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                         {paginatedHistory.length === 0 && <p className="text-center p-8 text-slate-500 dark:text-slate-400">Không có giao dịch nào.</p>}
+                    </div>
+                     {filteredHistory.length > HISTORY_ITEMS_PER_PAGE && <Pagination currentPage={historyPage} totalPages={Math.ceil(filteredHistory.length / HISTORY_ITEMS_PER_PAGE)} onPageChange={setHistoryPage} itemsPerPage={HISTORY_ITEMS_PER_PAGE} totalItems={filteredHistory.length} />}
+            </div>
+            )}
         </div>
     );
 };
