@@ -152,6 +152,42 @@ const INVENTORY_ITEMS_PER_PAGE = 15;
 const CATALOG_ITEMS_PER_PAGE = 12;
 const HISTORY_ITEMS_PER_PAGE = 25;
 
+// Fix: Add helper function to generate deterministic colors for product categories
+// --- Category Color Helper ---
+const categoryColors = [
+    'border-t-red-500',
+    'border-t-orange-500',
+    'border-t-amber-500',
+    'border-t-yellow-500',
+    'border-t-lime-500',
+    'border-t-green-500',
+    'border-t-emerald-500',
+    'border-t-teal-500',
+    'border-t-cyan-500',
+    'border-t-sky-500',
+    'border-t-blue-500',
+    'border-t-indigo-500',
+    'border-t-violet-500',
+    'border-t-purple-500',
+    'border-t-fuchsia-500',
+    'border-t-pink-500',
+    'border-t-rose-500',
+];
+
+const getCategoryColor = (category?: string): string => {
+    if (!category) {
+        return 'border-t-slate-400';
+    }
+    // Simple hash function to get a deterministic color
+    let hash = 0;
+    for (let i = 0; i < category.length; i++) {
+        hash = category.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash % categoryColors.length);
+    return categoryColors[index];
+};
+
+
 // --- Modals (re-using from previous implementation, ensure they are here and correct) ---
 // PartModal, TransactionModal, HistoryModal, TransferStockModal, CategorySettingsModal
 const PartModal: React.FC<{
@@ -732,6 +768,113 @@ const CategorySettingsModal: React.FC<{
         </div>
     );
 };
+
+// Fix: Add UploadModal component to handle CSV file imports.
+const UploadModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    setParts: React.Dispatch<React.SetStateAction<Part[]>>;
+    currentBranchId: string;
+}> = ({ isOpen, onClose, setParts, currentBranchId }) => {
+    const [file, setFile] = useState<File | null>(null);
+    const [error, setError] = useState('');
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            setFile(e.target.files[0]);
+            setError('');
+        }
+    };
+
+    const handleImport = () => {
+        if (!file) {
+            setError('Please select a file to upload.');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const text = e.target?.result;
+            if (typeof text !== 'string') {
+                setError('Could not read file.');
+                return;
+            }
+
+            try {
+                const rows = text.split('\n').slice(1); // Skip header row
+                const newParts: Part[] = rows.map(row => {
+                    const columns = row.split(',');
+                    if (columns.length < 6) return null;
+                    const [name, sku, category, price, sellingPrice, stock] = columns;
+                    return {
+                        id: `P${Date.now()}-${sku}`,
+                        name: name.trim(),
+                        sku: sku.trim(),
+                        category: category.trim(),
+                        price: parseFloat(price),
+                        sellingPrice: parseFloat(sellingPrice),
+                        stock: { [currentBranchId]: parseInt(stock) || 0 }
+                    };
+                }).filter((p): p is Part => p !== null);
+
+                setParts(prevParts => {
+                    const updatedParts = [...prevParts];
+                    newParts.forEach(newPart => {
+                        const existingIndex = updatedParts.findIndex(p => p.sku === newPart.sku);
+                        if (existingIndex !== -1) {
+                            // Update existing part
+                            updatedParts[existingIndex] = {
+                                ...updatedParts[existingIndex],
+                                ...newPart,
+                                id: updatedParts[existingIndex].id, // keep original id
+                                stock: {
+                                    ...updatedParts[existingIndex].stock,
+                                    ...newPart.stock
+                                }
+                            };
+                        } else {
+                            // Add new part
+                            updatedParts.push(newPart);
+                        }
+                    });
+                    return updatedParts;
+                });
+
+                onClose();
+
+            } catch (err) {
+                setError('Error parsing CSV file. Please check the format.');
+                console.error(err);
+            }
+        };
+        reader.readAsText(file);
+    };
+    
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg">
+                <div className="p-4 border-b dark:border-slate-700">
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Tải lên danh sách sản phẩm</h3>
+                </div>
+                <div className="p-6 space-y-4">
+                    <p className="text-sm text-slate-600 dark:text-slate-300">
+                        Tải lên tệp CSV với các cột: `name`, `sku`, `category`, `price`, `sellingPrice`, `stock`.
+                    </p>
+                    <input type="file" accept=".csv" onChange={handleFileChange} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100"/>
+                    {file && <p className="text-sm text-slate-500">Selected file: {file.name}</p>}
+                    {error && <p className="text-sm text-red-500">{error}</p>}
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-800 px-6 py-3 flex justify-end space-x-3 border-t dark:border-slate-700">
+                    <button onClick={onClose} className="bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">Hủy</button>
+                    <button onClick={handleImport} disabled={!file} className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700 disabled:bg-sky-300">Nhập</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 // --- Main Component ---
 interface InventoryManagerProps {
