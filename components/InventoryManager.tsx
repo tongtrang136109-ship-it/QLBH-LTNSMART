@@ -1115,28 +1115,77 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
     
     const parseCSVAndImport = (csvText: string) => {
         try {
+            // Handle Byte Order Mark (BOM)
+            if (csvText.charCodeAt(0) === 0xFEFF) {
+                csvText = csvText.substring(1);
+            }
+
             const lines = csvText.trim().split('\n').map(line => line.trim()).filter(Boolean);
             if (lines.length < 2) {
                 alert("Tệp CSV trống hoặc chỉ có dòng tiêu đề.");
                 return;
             }
 
-            const header = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
-            
-            const headerMap = {
-                name: header.findIndex(h => h.includes('tên')),
-                sku: header.findIndex(h => h.includes('mã sp') || h.includes('sku')),
-                category: header.findIndex(h => h.includes('danh mục')),
-                price: header.findIndex(h => h.includes('giá nhập')),
-                sellingPrice: header.findIndex(h => h.includes('giá bán')),
-                stock: header.findIndex(h => h.includes('tồn kho')),
+            // A more robust CSV row splitter that handles quoted fields
+            const splitCsvRow = (row: string): string[] => {
+                const parts = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                return parts.map(val => val.trim().replace(/^"|"$/g, '').trim());
             };
 
-            if (headerMap.name === -1 || headerMap.price === -1 || headerMap.sellingPrice === -1 || headerMap.stock === -1) {
-                alert('Tệp CSV phải chứa các cột: Tên, Giá nhập, Giá bán, Tồn kho.');
-                return;
+
+            const header = splitCsvRow(lines[0]).map(h => h.toLowerCase());
+
+            const headerPossibilities = {
+                name: ['tên sản phẩm', 'tên sp', 'tên hàng', 'tên', 'product name', 'name'],
+                sku: ['mã sp', 'sku', 'mã sản phẩm', 'mã hàng'],
+                category: ['danh mục', 'loại', 'nhóm hàng', 'category'],
+                price: ['giá nhập', 'giá vốn', 'purchase price', 'cost'],
+                sellingPrice: ['giá bán', 'giá lẻ', 'selling price', 'price', 'giá'],
+                stock: ['tồn kho', 'tồn', 'số lượng', 'sl', 'quantity', 'stock'],
+            };
+            
+            const headerMap: { [key: string]: number } = {};
+            const usedIndexes = new Set<number>();
+
+            // Find best match for each required field
+            for (const key in headerPossibilities) {
+                const possibilities = headerPossibilities[key as keyof typeof headerPossibilities];
+                let bestMatchIndex = -1;
+
+                // Prioritize exact matches first
+                for (const p of possibilities) {
+                    const index = header.findIndex(h => h === p);
+                    if (index !== -1 && !usedIndexes.has(index)) {
+                        bestMatchIndex = index;
+                        break;
+                    }
+                }
+
+                // If no exact match, try partial match (includes)
+                if (bestMatchIndex === -1) {
+                    for (const p of possibilities) {
+                        const index = header.findIndex(h => h.includes(p));
+                        if (index !== -1 && !usedIndexes.has(index)) {
+                            bestMatchIndex = index;
+                            break;
+                        }
+                    }
+                }
+
+                if (bestMatchIndex !== -1) {
+                    headerMap[key] = bestMatchIndex;
+                    usedIndexes.add(bestMatchIndex);
+                } else {
+                    headerMap[key] = -1;
+                }
             }
 
+            if (headerMap.name === -1 || headerMap.price === -1 || headerMap.sellingPrice === -1 || headerMap.stock === -1) {
+                alert('Tệp CSV phải chứa các cột có thể nhận dạng được là: Tên, Giá nhập, Giá bán, Tồn kho. Vui lòng kiểm tra lại tiêu đề cột.');
+                console.log("Header map:", headerMap, "Header found:", header);
+                return;
+            }
+            
             let addedCount = 0;
             let updatedCount = 0;
             let skippedCount = 0;
@@ -1148,13 +1197,23 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
             const rows = lines.slice(1);
 
             rows.forEach((rowStr, index) => {
-                const row = rowStr.split(',').map(v => v.trim().replace(/"/g, ''));
+                if (!rowStr) { // Skip empty lines
+                    skippedCount++;
+                    return;
+                }
+                const row = splitCsvRow(rowStr);
                 
                 const name = row[headerMap.name];
                 const sku = headerMap.sku !== -1 ? row[headerMap.sku] : null;
                 const category = (headerMap.category !== -1 ? row[headerMap.category] : 'Chưa phân loại') || 'Chưa phân loại';
                 
-                const parseCurrency = (val: string) => val ? parseFloat(val.replace(/\./g, '').replace(/,/g, '.')) : NaN;
+                // More robust currency parsing
+                const parseCurrency = (val: string) => {
+                    if (!val) return NaN;
+                    // Remove all non-digit characters except for a single comma or dot for decimals
+                    const cleaned = val.replace(/[^\d,.-]/g, '').replace(',', '.');
+                    return parseFloat(cleaned);
+                }
                 
                 const price = parseCurrency(row[headerMap.price]);
                 const sellingPrice = parseCurrency(row[headerMap.sellingPrice]);
@@ -1162,7 +1221,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
 
                 if (!name || isNaN(price) || isNaN(sellingPrice) || isNaN(stock)) {
                     skippedCount++;
-                    console.warn(`Bỏ qua dòng ${index + 2}: Dữ liệu không hợp lệ.`);
+                    console.warn(`Bỏ qua dòng ${index + 2}: Dữ liệu không hợp lệ.`, { name, price, sellingPrice, stock });
                     return;
                 }
 
@@ -1178,6 +1237,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
                 let partForTransaction: Part;
 
                 if (existingPartIndex > -1) {
+                    // Update existing part
                     const existingPart = updatedPartsList[existingPartIndex];
                     const updatedPart: Part = {
                         ...existingPart,
@@ -1193,6 +1253,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
                     partForTransaction = updatedPart;
                     updatedCount++;
                 } else {
+                    // Add new part
                     const newPart: Part = {
                         id: `P${Date.now()}-${index}`,
                         name,
@@ -1238,9 +1299,10 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({ currentUser, parts,
             alert(message);
         } catch (error) {
             console.error("Lỗi khi xử lý tệp CSV:", error);
-            alert("Đã xảy ra lỗi khi xử lý tệp. Vui lòng kiểm tra định dạng và thử lại.");
+            alert("Đã xảy ra lỗi khi xử lý tệp. Vui lòng kiểm tra định dạng tệp và thử lại.");
         }
     };
+
 
     return (
         <div>
