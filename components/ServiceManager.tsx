@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { WorkOrder, Part, User, StoreSettings, WorkOrderPart, Customer, QuotationItem, Department } from '../types';
+import type { WorkOrder, Part, User, StoreSettings, WorkOrderPart, Customer, QuotationItem, Department, PaymentSource, CashTransaction } from '../types';
 import { PlusIcon, PencilSquareIcon, TrashIcon, PrinterIcon, XMarkIcon, ChevronDownIcon, ExclamationTriangleIcon } from './common/Icons';
 import Pagination from './common/Pagination';
 
@@ -126,7 +126,7 @@ const SectionWrapper: React.FC<{
 const WorkOrderModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
-    onSave: (workOrder: WorkOrder) => void;
+    onSave: (workOrder: WorkOrder, newTransaction?: CashTransaction) => void;
     workOrder: WorkOrder | null;
     parts: Part[];
     currentBranchId: string;
@@ -135,7 +135,8 @@ const WorkOrderModal: React.FC<{
     workOrders: WorkOrder[];
     users: User[];
     departments: Department[];
-}> = ({ isOpen, onClose, onSave, workOrder, parts, currentBranchId, customers, setCustomers, workOrders, users, departments }) => {
+    paymentSources: PaymentSource[];
+}> = ({ isOpen, onClose, onSave, workOrder, parts, currentBranchId, customers, setCustomers, workOrders, users, departments, paymentSources }) => {
     const [formData, setFormData] = useState<Omit<WorkOrder, 'id' | 'creationDate' | 'total'>>(() => {
         const defaults = {
             customerName: '', customerPhone: '', vehicleModel: '', licensePlate: '', issueDescription: '',
@@ -143,6 +144,7 @@ const WorkOrderModal: React.FC<{
             branchId: currentBranchId,
             discount: 0,
             mileage: undefined,
+            paymentStatus: 'unpaid' as const
         };
         return workOrder ? { ...workOrder } : defaults;
     });
@@ -155,10 +157,13 @@ const WorkOrderModal: React.FC<{
     const [oilChangeWarning, setOilChangeWarning] = useState<string | null>(null);
     const [activeSection, setActiveSection] = useState<string | null>('customer');
 
-    // State for part search
     const [partSearchTerm, setPartSearchTerm] = useState('');
     const [isPartListOpen, setIsPartListOpen] = useState(false);
     const partInputRef = useRef<HTMLDivElement>(null);
+    
+    // Payment State
+    const [isPaid, setIsPaid] = useState(workOrder?.paymentStatus === 'paid');
+    const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank'>(workOrder?.paymentMethod || 'cash');
 
     const getStatusColorClass = (status: WorkOrder['status']) => {
         switch (status) {
@@ -176,12 +181,16 @@ const WorkOrderModal: React.FC<{
             technicianName: '', status: 'Tiếp nhận' as const, laborCost: 0, partsUsed: [], quotationItems: [], notes: '',
             branchId: currentBranchId,
             discount: 0,
-            mileage: undefined
+            mileage: undefined,
+            paymentStatus: 'unpaid' as const,
         };
         setFormData(workOrder ? { ...workOrder, quotationItems: workOrder.quotationItems || [] } : defaults);
         setCustomerSearch(workOrder ? workOrder.customerName : '');
         setOilChangeWarning(null);
         setActiveSection('customer'); // Reset accordion
+        // Reset payment state
+        setIsPaid(workOrder?.paymentStatus === 'paid');
+        setPaymentMethod(workOrder?.paymentMethod || 'cash');
     }, [workOrder, currentBranchId, isOpen]);
     
     useEffect(() => {
@@ -376,14 +385,58 @@ const WorkOrderModal: React.FC<{
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        
+        let newTransaction: CashTransaction | undefined = undefined;
+        let finalPaymentStatus = workOrder?.paymentStatus || 'unpaid';
+        let finalPaymentMethod = workOrder?.paymentMethod;
+        let finalPaymentDate = workOrder?.paymentDate;
+        let finalCashTransactionId = workOrder?.cashTransactionId;
+
+        // Check if a new payment is being recorded
+        if (isPaid && workOrder?.paymentStatus !== 'paid' && total > 0) {
+            const paymentSource = paymentSources.find(p => p.id === paymentMethod);
+            if (!paymentSource) {
+                alert('Nguồn tiền không hợp lệ!');
+                return;
+            }
+
+            const transactionId = `CT-${Date.now()}`;
+            newTransaction = {
+                id: transactionId,
+                type: 'income',
+                date: new Date().toISOString(),
+                amount: total,
+                contact: { id: formData.customerPhone, name: formData.customerName },
+                notes: `Thanh toán cho phiếu sửa chữa #${workOrder?.id || 'MỚI'}`,
+                paymentSourceId: paymentMethod,
+                branchId: currentBranchId,
+                workOrderId: workOrder?.id || `S${String(Math.floor(Math.random() * 900) + 100)}` // Use existing or temp ID
+            };
+
+            finalPaymentStatus = 'paid';
+            finalPaymentMethod = paymentMethod;
+            finalPaymentDate = new Date().toISOString().split('T')[0];
+            finalCashTransactionId = transactionId;
+        }
+        
         const finalWorkOrder: WorkOrder = {
             id: workOrder?.id || `S${String(Math.floor(Math.random() * 900) + 100)}`,
             creationDate: workOrder?.creationDate || new Date().toISOString().split('T')[0],
             ...formData,
             branchId: formData.branchId || currentBranchId,
             total,
+            paymentStatus: finalPaymentStatus,
+            paymentMethod: finalPaymentMethod,
+            paymentDate: finalPaymentDate,
+            cashTransactionId: finalCashTransactionId,
         };
-        onSave(finalWorkOrder);
+
+        // If it's a new work order, ensure its ID matches the one in the transaction
+        if (!workOrder) {
+            if (newTransaction) newTransaction.workOrderId = finalWorkOrder.id;
+        }
+
+        onSave(finalWorkOrder, newTransaction);
     };
 
     if (!isOpen) return null;
@@ -680,6 +733,38 @@ const WorkOrderModal: React.FC<{
                                 </div>
                             </div>
                         </div>
+                        {formData.status === 'Trả máy' && (
+                            <div className="border-t border-slate-300 dark:border-slate-600 mt-4 pt-4">
+                                <h4 className="font-semibold text-slate-800 dark:text-slate-100 mb-2">Thanh toán</h4>
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:gap-6">
+                                    <div className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            id="is-paid-checkbox"
+                                            checked={isPaid}
+                                            onChange={e => setIsPaid(e.target.checked)}
+                                            disabled={workOrder?.paymentStatus === 'paid'}
+                                            className="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+                                        />
+                                        <label htmlFor="is-paid-checkbox" className="ml-2 font-medium text-slate-700 dark:text-slate-300">
+                                            {workOrder?.paymentStatus === 'paid' ? 'Đã thanh toán' : 'Đánh dấu đã thanh toán'}
+                                        </label>
+                                    </div>
+                                    {isPaid && (
+                                        <div className="flex items-center gap-4 mt-2 sm:mt-0">
+                                            <label className="flex items-center text-slate-700 dark:text-slate-300">
+                                                <input type="radio" name="paymentMethod" value="cash" checked={paymentMethod === 'cash'} onChange={() => setPaymentMethod('cash')} disabled={workOrder?.paymentStatus === 'paid'} className="mr-1"/>
+                                                Tiền mặt
+                                            </label>
+                                             <label className="flex items-center text-slate-700 dark:text-slate-300">
+                                                <input type="radio" name="paymentMethod" value="bank" checked={paymentMethod === 'bank'} onChange={() => setPaymentMethod('bank')} disabled={workOrder?.paymentStatus === 'paid'} className="mr-1"/>
+                                                Chuyển khoản
+                                            </label>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                         <div className="flex justify-end space-x-3 mt-4">
                             <button type="button" onClick={onClose} className="bg-slate-200 text-slate-800 dark:bg-slate-600 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500">Hủy</button>
                             <button type="submit" className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700">Lưu Phiếu</button>
@@ -863,11 +948,15 @@ interface ServiceManagerProps {
     setCustomers: React.Dispatch<React.SetStateAction<Customer[]>>;
     users: User[];
     departments: Department[];
+    paymentSources: PaymentSource[];
+    setPaymentSources: React.Dispatch<React.SetStateAction<PaymentSource[]>>;
+    cashTransactions: CashTransaction[];
+    setCashTransactions: React.Dispatch<React.SetStateAction<CashTransaction[]>>;
 }
 
 const ITEMS_PER_PAGE = 15;
 
-const ServiceManager: React.FC<ServiceManagerProps> = ({ currentUser, workOrders, setWorkOrders, parts, storeSettings, currentBranchId, customers, setCustomers, users, departments }) => {
+const ServiceManager: React.FC<ServiceManagerProps> = ({ currentUser, workOrders, setWorkOrders, parts, storeSettings, currentBranchId, customers, setCustomers, users, departments, paymentSources, setPaymentSources, cashTransactions, setCashTransactions }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
     const [statusFilter, setStatusFilter] = useState('all');
@@ -900,12 +989,26 @@ const ServiceManager: React.FC<ServiceManagerProps> = ({ currentUser, workOrders
         setInvoiceWorkOrder(null);
     };
 
-    const handleSaveWorkOrder = (workOrder: WorkOrder) => {
+    const handleSaveWorkOrder = (workOrder: WorkOrder, newTransaction?: CashTransaction) => {
         if (selectedWorkOrder) {
             setWorkOrders(prev => prev.map(wo => wo.id === workOrder.id ? workOrder : wo));
         } else {
             setWorkOrders(prev => [workOrder, ...prev]);
         }
+        
+        if (newTransaction) {
+            setCashTransactions(prev => [newTransaction, ...prev]);
+            setPaymentSources(prevSources => prevSources.map(ps => {
+                if (ps.id === newTransaction.paymentSourceId) {
+                    const newBalance = { ...ps.balance };
+                    const change = newTransaction.amount; // Always income for services
+                    newBalance[currentBranchId] = (newBalance[currentBranchId] || 0) + change;
+                    return { ...ps, balance: newBalance };
+                }
+                return ps;
+            }));
+        }
+
         handleCloseModal();
     };
 
@@ -954,6 +1057,7 @@ const ServiceManager: React.FC<ServiceManagerProps> = ({ currentUser, workOrders
                 workOrders={workOrders}
                 users={users}
                 departments={departments}
+                paymentSources={paymentSources}
             />
             <PrintInvoiceModal
                 isOpen={isInvoiceModalOpen}
