@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { WorkOrder, InventoryTransaction, Part, StoreSettings, FixedAsset, CapitalInvestment } from '../types';
 import { BanknotesIcon, ChartBarIcon, WrenchScrewdriverIcon, BuildingLibraryIcon, ArchiveBoxIcon, SparklesIcon, LoadingSpinner } from './common/Icons';
-import { getBusinessAnalysis } from '../services/geminiService';
 
 
 const formatCurrency = (amount: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
