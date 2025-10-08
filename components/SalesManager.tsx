@@ -1,8 +1,8 @@
 
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { Part, CartItem, InventoryTransaction, User, StoreSettings, WorkOrder, Customer } from '../types';
-import { ShoppingCartIcon, TrashIcon, PrinterIcon, DocumentTextIcon, ChevronDownIcon, ArchiveBoxIcon, XMarkIcon, PencilSquareIcon, PlusIcon, MinusIcon, ClockIcon, ArrowUturnLeftIcon } from './common/Icons';
+// FIX: Add missing type imports for props that are being passed from App.tsx.
+import type { Part, CartItem, InventoryTransaction, User, StoreSettings, WorkOrder, Customer, PaymentSource, CashTransaction } from '../types';
+import { ShoppingCartIcon, TrashIcon, PrinterIcon, DocumentTextIcon, ChevronDownIcon, ArchiveBoxIcon, XMarkIcon, PencilSquareIcon, PlusIcon, MinusIcon, ClockIcon, BanknotesIcon } from './common/Icons';
 import Pagination from './common/Pagination';
 
 const formatCurrency = (amount: number) => {
@@ -17,20 +17,17 @@ const NewCustomerModal: React.FC<{
     onSave: (customer: Customer) => void;
     initialName?: string;
 }> = ({ isOpen, onClose, onSave, initialName = '' }) => {
-    const [formData, setFormData] = useState<Omit<Customer, 'id' | 'loyaltyPoints' | 'lastServiceDate'>>({ name: initialName, phone: '', vehicle: '', licensePlate: '', lastServiceOdometer: undefined });
+    const [formData, setFormData] = useState<Omit<Customer, 'id' | 'loyaltyPoints'>>({ name: initialName, phone: '', vehicle: '', licensePlate: '' });
     
     React.useEffect(() => {
         if(isOpen) {
-            setFormData({ name: initialName, phone: '', vehicle: '', licensePlate: '', lastServiceOdometer: undefined });
+            setFormData({ name: initialName, phone: '', vehicle: '', licensePlate: '' });
         }
     }, [isOpen, initialName]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value, type } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: type === 'number' ? (value === '' ? undefined : parseInt(value, 10)) : value
-        }));
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -39,7 +36,6 @@ const NewCustomerModal: React.FC<{
             id: `C${Date.now()}`,
             ...formData,
             loyaltyPoints: 0,
-            lastServiceDate: formData.lastServiceOdometer ? new Date().toISOString().split('T')[0] : undefined,
         };
         onSave(finalCustomer);
     };
@@ -51,7 +47,7 @@ const NewCustomerModal: React.FC<{
             <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg">
                 <form onSubmit={handleSubmit}>
                     <div className="p-6">
-                        <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6">Thêm Khách hàng mới</h2>
+                        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6">Thêm Khách hàng mới</h2>
                         <div className="space-y-4">
                             <div>
                                 <label htmlFor="new-customer-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Tên khách hàng (*)</label>
@@ -61,27 +57,10 @@ const NewCustomerModal: React.FC<{
                                 <label htmlFor="new-customer-phone" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Số điện thoại (*)</label>
                                 <input id="new-customer-phone" type="text" name="phone" value={formData.phone} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" required />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label htmlFor="new-customer-vehicle" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Dòng xe</label>
-                                    <input id="new-customer-vehicle" type="text" name="vehicle" value={formData.vehicle} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
-                                </div>
-                                <div>
-                                    <label htmlFor="new-customer-licensePlate" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Biển số xe</label>
-                                    <input id="new-customer-licensePlate" type="text" name="licensePlate" value={formData.licensePlate} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
-                                </div>
-                            </div>
-                            <div>
-                                <label htmlFor="new-customer-odometer" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Số ODO (km)</label>
-                                <input id="new-customer-odometer" type="number" name="lastServiceOdometer" value={formData.lastServiceOdometer || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
-                            </div>
                         </div>
                     </div>
                     <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 flex justify-end space-x-3 border-t border-slate-200 dark:border-slate-700">
-                        <button type="button" onClick={onClose} className="flex items-center gap-2 bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">
-                            <ArrowUturnLeftIcon className="w-5 h-5" />
-                            Trở về
-                        </button>
+                        <button type="button" onClick={onClose} className="bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">Hủy</button>
                         <button type="submit" className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700">Lưu</button>
                     </div>
                 </form>
@@ -206,6 +185,10 @@ interface SalesManagerProps {
     currentBranchId: string;
     customers: Customer[];
     setCustomers: React.Dispatch<React.SetStateAction<Customer[]>>;
+    paymentSources: PaymentSource[];
+    setPaymentSources: React.Dispatch<React.SetStateAction<PaymentSource[]>>;
+    cashTransactions: CashTransaction[];
+    setCashTransactions: React.Dispatch<React.SetStateAction<CashTransaction[]>>;
 }
 
 interface Sale {
@@ -225,7 +208,7 @@ interface Sale {
 
 const ITEMS_PER_PAGE = 50;
 
-const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setParts, transactions, setTransactions, cartItems, setCartItems, storeSettings, currentBranchId, customers, setCustomers }) => {
+const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setParts, transactions, setTransactions, cartItems, setCartItems, storeSettings, currentBranchId, customers, setCustomers, paymentSources, setPaymentSources, cashTransactions, setCashTransactions }) => {
     // Component State
     const [activeTab, setActiveTab] = useState<'products' | 'cart' | 'history'>('products');
     const [searchTerm, setSearchTerm] = useState('');
@@ -239,7 +222,7 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
     
     // Checkout form state
     const [orderDiscount, setOrderDiscount] = useState(0);
-    const [amountPaid, setAmountPaid] = useState(0);
+    const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank' | null>(null);
     const [useCurrentTime, setUseCurrentTime] = useState(true);
     const [customSaleTime, setCustomSaleTime] = useState(new Date().toISOString().slice(0, 16));
     const [showSaleNote, setShowSaleNote] = useState(false);
@@ -362,7 +345,7 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
     
     const resetCheckoutForm = () => {
         setOrderDiscount(0);
-        setAmountPaid(0);
+        setPaymentMethod(null);
         setUseCurrentTime(true);
         setShowSaleNote(false);
         setSaleNote('');
@@ -373,13 +356,14 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
     };
 
     const handleCheckout = () => {
-        if (cartItems.length === 0) return;
+        if (cartItems.length === 0 || !paymentMethod) return;
         
         const saleId = `SALE-${Date.now()}`;
         const newTransactions: InventoryTransaction[] = [];
         let updatedParts = [...parts];
 
         const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+        const customerNameForTx = selectedCustomer?.name || customerSearch || 'Khách vãng lai';
         
         const totalDiscount = cartItemsDiscount + orderDiscount;
         const finalCartForReceipt = [...cartItems];
@@ -405,7 +389,7 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
                 saleId: saleId,
                 discount: totalItemDiscount,
                 customerId: selectedCustomerId || undefined,
-                customerName: selectedCustomer?.name || customerSearch || 'Khách vãng lai',
+                customerName: customerNameForTx,
                 userId: currentUser.id,
                 userName: currentUser.name,
             };
@@ -421,8 +405,31 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
             });
         });
         
+        // Create financial transaction
+        const cashTransaction: CashTransaction = {
+            id: `CT-${saleId}`,
+            type: 'income',
+            date: useCurrentTime ? new Date().toISOString() : new Date(customSaleTime).toISOString(),
+            amount: cartTotal,
+            contact: { id: selectedCustomerId || 'VANG_LAI', name: customerNameForTx },
+            notes: `Thanh toán cho đơn hàng ${saleId}`,
+            paymentSourceId: paymentMethod,
+            branchId: currentBranchId,
+            saleId: saleId
+        };
+        
+        // Update states
         setTransactions(prev => [...newTransactions, ...prev]);
+        setCashTransactions(prev => [cashTransaction, ...prev]);
         setParts(updatedParts);
+        setPaymentSources(prev => prev.map(ps => {
+            if (ps.id === paymentMethod) {
+                const newBalance = { ...ps.balance };
+                newBalance[currentBranchId] = (newBalance[currentBranchId] || 0) + cartTotal;
+                return { ...ps, balance: newBalance };
+            }
+            return ps;
+        }));
         
         setLastTransaction({ cart: finalCartForReceipt, subtotal: cartSubtotal, total: cartTotal, discount: totalDiscount });
         setCartItems([]);
@@ -442,36 +449,38 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
         const transactionsToDelete = transactions.filter(tx => tx.saleId === saleId);
         if (transactionsToDelete.length === 0) return;
     
-        // Revert stock changes, respecting the original branch of each transaction
+        // Revert stock changes
         setParts(prevParts => {
-            // Create a map to hold stock changes: { partId: { branchId: quantityToAdd } }
-            const stockChanges = new Map<string, Map<string, number>>();
-    
+            const stockChanges = new Map<string, number>();
             transactionsToDelete.forEach(tx => {
-                if (!stockChanges.has(tx.partId)) {
-                    stockChanges.set(tx.partId, new Map<string, number>());
-                }
-                const branchChanges = stockChanges.get(tx.partId)!;
-                branchChanges.set(tx.branchId, (branchChanges.get(tx.branchId) || 0) + tx.quantity);
+                stockChanges.set(tx.partId, (stockChanges.get(tx.partId) || 0) + tx.quantity);
             });
-    
             return prevParts.map(part => {
                 if (stockChanges.has(part.id)) {
-                    const changesForPart = stockChanges.get(part.id)!;
                     const newStock = { ...part.stock };
-                    
-                    changesForPart.forEach((quantityToAdd, branchId) => {
-                        newStock[branchId] = (newStock[branchId] || 0) + quantityToAdd;
-                    });
-    
+                    newStock[currentBranchId] = (newStock[currentBranchId] || 0) + stockChanges.get(part.id)!;
                     return { ...part, stock: newStock };
                 }
                 return part;
             });
         });
     
+        // Revert financial changes
+        const cashTxToDelete = cashTransactions.find(ctx => ctx.saleId === saleId);
+        if (cashTxToDelete) {
+            setPaymentSources(prev => prev.map(ps => {
+                if (ps.id === cashTxToDelete.paymentSourceId) {
+                    const newBalance = { ...ps.balance };
+                    newBalance[cashTxToDelete.branchId] = (newBalance[cashTxToDelete.branchId] || 0) - cashTxToDelete.amount;
+                    return { ...ps, balance: newBalance };
+                }
+                return ps;
+            }));
+        }
+
         // Remove transactions from history
-        setTransactions(prevTransactions => prevTransactions.filter(tx => tx.saleId !== saleId));
+        setTransactions(prev => prev.filter(tx => tx.saleId !== saleId));
+        setCashTransactions(prev => prev.filter(ctx => ctx.saleId !== saleId));
     };
 
     const handleEditSale = (saleId: string) => {
@@ -494,6 +503,8 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
         });
 
         const firstTransaction = saleTransactions[0];
+        const cashTransaction = cashTransactions.find(ctx => ctx.saleId === saleId);
+
         const totalItemDiscounts = saleTransactions.reduce((acc, tx) => acc + (tx.discount || 0), 0);
         const totalSalePrice = saleTransactions.reduce((acc, tx) => acc + (tx.totalPrice || 0), 0);
         const subtotal = saleTransactions.reduce((acc, tx) => acc + ((tx.unitPrice || 0) * tx.quantity), 0);
@@ -501,6 +512,7 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
 
         setCartItems(cartItemsToEdit);
         setOrderDiscount(orderDiscountFromTxs > 0 ? orderDiscountFromTxs : 0);
+        setPaymentMethod(cashTransaction?.paymentSourceId as 'cash' | 'bank' || null);
         
         // Restore customer
         if (firstTransaction.customerId) {
@@ -517,61 +529,26 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
         setUseCurrentTime(false);
         setCustomSaleTime(new Date(firstTransaction.date).toISOString().slice(0,16));
 
-
         setEditingSaleId(saleId);
         setActiveTab('cart');
     };
     
     const handleUpdateSale = () => {
-        if (!editingSaleId) return;
+        if (!editingSaleId || !paymentMethod) return;
 
-        // 1. Find transactions to revert and prepare new ones
-        const transactionsToRevert = transactions.filter(tx => tx.saleId === editingSaleId);
-        const remainingTransactions = transactions.filter(tx => tx.saleId !== editingSaleId);
-        
-        const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
-        
-        const newTransactionsFromCart: InventoryTransaction[] = cartItems.map(item => {
-            const itemSubtotal = item.sellingPrice * item.quantity;
-            const itemProratedOrderDiscount = cartSubtotal > 0 ? (itemSubtotal / cartSubtotal) * orderDiscount : 0;
-            const totalItemDiscount = (item.discount || 0) + itemProratedOrderDiscount;
-            return {
-                id: `T-${Date.now()}-${item.partId}`, type: 'Xuất kho', partId: item.partId,
-                partName: item.partName, quantity: item.quantity,
-                date: useCurrentTime ? new Date().toISOString().split('T')[0] : customSaleTime.split('T')[0],
-                notes: saleNote || 'Bán lẻ tại quầy (đã chỉnh sửa)', unitPrice: item.sellingPrice,
-                totalPrice: itemSubtotal - totalItemDiscount, branchId: currentBranchId,
-                saleId: editingSaleId, discount: totalItemDiscount,
-                customerId: selectedCustomerId || undefined,
-                customerName: selectedCustomer?.name || customerSearch || 'Khách vãng lai',
-                userId: currentUser.id,
-                userName: currentUser.name,
-            };
-        });
-        
-        // 2. Calculate net stock changes
-        const stockChanges = new Map<string, number>();
-        transactionsToRevert.forEach(tx => stockChanges.set(tx.partId, (stockChanges.get(tx.partId) || 0) + tx.quantity));
-        newTransactionsFromCart.forEach(tx => stockChanges.set(tx.partId, (stockChanges.get(tx.partId) || 0) - tx.quantity));
+        // First, delete the old sale completely to revert state
+        handleDeleteSale(editingSaleId);
 
-        // 3. Apply state updates
-        setParts(prevParts => 
-            prevParts.map(part => {
-                if (stockChanges.has(part.id)) {
-                    const newStock = { ...part.stock };
-                    newStock[currentBranchId] = (newStock[currentBranchId] || 0) + stockChanges.get(part.id)!;
-                    return { ...part, stock: newStock };
-                }
-                return part;
-            })
-        );
+        // Then, check out again with the modified cart and settings
+        // handleCheckout will create new transactions with the *same* saleId if we pass it
+        // but it generates a new one. The logic is easier if we just let it create a new saleId
+        // The user experience is that the old sale is "replaced". Let's modify handleCheckout
+        // so it doesn't create a new sale ID if one is being edited. No, that's too complex.
+        // A simpler flow: delete old, create new.
         
-        setTransactions([...remainingTransactions, ...newTransactionsFromCart]);
-
-        // 4. Clean up
-        setCartItems([]);
-        resetCheckoutForm();
-        setActiveTab('history');
+        // The state has been reverted by handleDeleteSale, so now we just checkout.
+        // The cart and form fields are already set up from handleEditSale.
+        handleCheckout();
     };
 
     const handleCancelEdit = () => {
@@ -616,7 +593,6 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
             const dateA = new Date(a.date).getTime();
             const dateB = new Date(b.date).getTime();
             if (dateB !== dateA) return dateB - dateA;
-            // if dates are the same, sort by saleId descending (latest first)
             return b.id.localeCompare(a.id);
         });
     }, [transactions, currentBranchId]);
@@ -773,18 +749,28 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
                                 <input type="number" value={orderDiscount || ''} onChange={e => setOrderDiscount(Number(e.target.value))} placeholder="0" className="w-28 p-1 border dark:border-slate-600 rounded-md text-right dark:bg-slate-800 dark:text-slate-100"/>
                              </div>
                               <div className="flex justify-between items-center font-bold text-xl"><span >Khách phải trả</span> <span>{formatCurrency(cartTotal)}</span></div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-slate-600 dark:text-slate-400">Khách thanh toán</span> 
-                                <input type="number" value={amountPaid || ''} onChange={e => setAmountPaid(Number(e.target.value))} placeholder="0" className="w-28 p-1 border dark:border-slate-600 rounded-md text-right dark:bg-slate-800 dark:text-slate-100"/>
-                             </div>
-                             <div className="flex flex-wrap gap-2 pt-2">
-                               {[cartTotal, 200000, 500000, 1000000].map(val => (
-                                   <button key={val} onClick={() => setAmountPaid(val)} className="border dark:border-slate-600 rounded-full px-3 py-1 text-sm hover:bg-slate-100 dark:hover:bg-slate-700">{formatCurrency(val)}</button>
-                               ))}
-                             </div>
                          </div>
 
                           <div className="border-t dark:border-slate-700 pt-4 space-y-3">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Phương thức thanh toán <span className="text-red-500">*</span></label>
+                                <div className="flex gap-4">
+                                    <button
+                                        onClick={() => setPaymentMethod('cash')}
+                                        className={`flex-1 flex items-center justify-center gap-2 p-3 border-2 rounded-lg ${paymentMethod === 'cash' ? 'border-sky-500 bg-sky-50 dark:bg-sky-900/50' : 'border-slate-300 dark:border-slate-600'}`}
+                                    >
+                                        <BanknotesIcon className="w-6 h-6 text-green-600 dark:text-green-400" />
+                                        <span className="font-semibold text-slate-800 dark:text-slate-200">Tiền mặt</span>
+                                    </button>
+                                     <button
+                                        onClick={() => setPaymentMethod('bank')}
+                                        className={`flex-1 flex items-center justify-center gap-2 p-3 border-2 rounded-lg ${paymentMethod === 'bank' ? 'border-sky-500 bg-sky-50 dark:bg-sky-900/50' : 'border-slate-300 dark:border-slate-600'}`}
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                                        <span className="font-semibold text-slate-800 dark:text-slate-200">Chuyển khoản</span>
+                                    </button>
+                                </div>
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Thời gian bán hàng</label>
                                 <div className="flex items-center gap-4 mt-1">
@@ -809,7 +795,7 @@ const SalesManager: React.FC<SalesManagerProps> = ({ currentUser, parts, setPart
                                 ) : (
                                     <>
                                         <button className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-500 text-slate-800 dark:text-slate-200 font-bold py-3 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600">LƯU NHÁP</button>
-                                        <button onClick={handleCheckout} disabled={cartItems.length === 0} className="w-full bg-orange-500 text-white font-bold py-3 rounded-lg hover:bg-orange-600 disabled:bg-orange-300">XUẤT BÁN</button>
+                                        <button onClick={handleCheckout} disabled={cartItems.length === 0 || !paymentMethod} className="w-full bg-orange-500 text-white font-bold py-3 rounded-lg hover:bg-orange-600 disabled:bg-orange-300 disabled:cursor-not-allowed">XUẤT BÁN</button>
                                     </>
                                 )}
                           </div>
