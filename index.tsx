@@ -1,11 +1,14 @@
-// index.tsx (ở root repo)
-import React from "react";
-import { createRoot } from "react-dom/client";
-import App from "./App";
-import "./index.css"; // ← QUAN TRỌNG: import CSS tại đây
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App'
 
-createRoot(document.getElementById("root")!).render(
+const rootEl = document.getElementById('root')
+if (!rootEl) {
+  throw new Error('Root element #root không tồn tại trong index.html')
+}
+
+ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
-);
+)
