@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { WorkOrder, InventoryTransaction, Part, StoreSettings, FixedAsset, CapitalInvestment } from '../types';
-import { BanknotesIcon, ChartBarIcon, WrenchScrewdriverIcon, BuildingLibraryIcon, ArchiveBoxIcon, SparklesIcon, LoadingSpinner } from './common/Icons';
-
+import { BanknotesIcon, ChartBarIcon, WrenchScrewdriverIcon, BuildingLibraryIcon, ArchiveBoxIcon } from './common/Icons';
 
 const formatCurrency = (amount: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 
@@ -82,6 +81,34 @@ const SalesTrendChart: React.FC<{ data: { label: string; revenue: number; profit
     );
 };
 
+const AnalysisCard: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200/60 dark:border-slate-700">
+        <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-4">{title}</h3>
+        {children}
+    </div>
+);
+
+const ListItem: React.FC<{ label: string; value: string; subValue?: string; }> = ({ label, value, subValue }) => (
+    <div className="flex justify-between items-center text-sm py-2 border-b border-slate-100 dark:border-slate-700 last:border-b-0">
+        <span className="text-slate-700 dark:text-slate-300 truncate pr-4">{label}</span>
+        <div className="text-right flex-shrink-0">
+            <span className="font-semibold text-slate-800 dark:text-slate-100">{value}</span>
+            {subValue && <span className="text-xs text-slate-500 dark:text-slate-400 block">{subValue}</span>}
+        </div>
+    </div>
+);
+
+const CategoryItem: React.FC<{ name: string; revenue: number; percentage: number }> = ({ name, revenue, percentage }) => (
+    <div>
+        <div className="flex justify-between text-sm mb-1">
+            <span className="font-medium text-slate-800 dark:text-slate-200">{name}</span>
+            <span className="font-semibold text-slate-600 dark:text-slate-300">{formatCurrency(revenue)}</span>
+        </div>
+        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
+            <div className="bg-indigo-500 h-2.5 rounded-full" style={{ width: `${percentage}%` }} title={`${percentage.toFixed(1)}%`} />
+        </div>
+    </div>
+);
 
 // --- Main Component ---
 interface ExecutiveSummaryProps {
@@ -102,8 +129,6 @@ const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ workOrders, transac
         return d.toISOString().split('T')[0];
     });
     const [activeTab, setActiveTab] = useState<'overview' | 'analysis'>('overview');
-    const [analysis, setAnalysis] = useState<Record<string, { content: string; error?: string }>>({});
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
 
     const setDateRange = (days: number) => {
         const end = new Date();
@@ -113,56 +138,54 @@ const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ workOrders, transac
         setStartDate(start.toISOString().split('T')[0]);
     };
 
-    const processedSales = useMemo(() => {
-        const workOrderItems = workOrders
-            .filter(wo => wo.status === 'Trả máy' && wo.partsUsed)
-            .flatMap(wo => wo.partsUsed!.map(usedPart => {
-                const partInfo = parts.find(p => p.id === usedPart.partId);
-                return {
-                    date: wo.creationDate, revenue: usedPart.price * usedPart.quantity,
-                    cost: (partInfo?.price || 0) * usedPart.quantity,
-                    partId: usedPart.partId, partName: usedPart.partName,
-                    quantity: usedPart.quantity, branchId: wo.branchId
-                };
-            }));
-
-        const laborRevenue = workOrders
-            .filter(wo => wo.status === 'Trả máy' && wo.laborCost > 0)
-            .map(wo => ({
-                date: wo.creationDate, revenue: wo.laborCost, cost: 0,
-                partId: 'LABOR', partName: 'Tiền công sửa chữa',
-                quantity: 1, branchId: wo.branchId
-            }));
-
-        const retailSaleItems = transactions
-            .filter(tx => tx.type === 'Xuất kho' && tx.saleId)
-            .map(tx => {
-                const partInfo = parts.find(p => p.id === tx.partId);
-                return {
-                    date: tx.date, revenue: tx.totalPrice || 0,
-                    cost: (partInfo?.price || 0) * tx.quantity,
-                    partId: tx.partId, partName: tx.partName,
-                    quantity: tx.quantity, branchId: tx.branchId
-                };
-            });
-
-        return [...workOrderItems, ...laborRevenue, ...retailSaleItems];
-    }, [workOrders, transactions, parts]);
-
-    const reportData = useMemo(() => {
+    const processedData = useMemo(() => {
         const start = new Date(`${startDate}T00:00:00`);
         const end = new Date(`${endDate}T23:59:59`);
         
-        const filteredSales = processedSales.filter(sale => {
+        const allSales = [
+            ...workOrders
+                .filter(wo => wo.status === 'Trả máy' && wo.partsUsed)
+                .flatMap(wo => wo.partsUsed!.map(usedPart => {
+                    const partInfo = parts.find(p => p.id === usedPart.partId);
+                    return {
+                        date: wo.creationDate, revenue: usedPart.price * usedPart.quantity,
+                        cost: (partInfo?.price || 0) * usedPart.quantity,
+                        partId: usedPart.partId, partName: usedPart.partName,
+                        quantity: usedPart.quantity, branchId: wo.branchId,
+                        category: partInfo?.category || 'Chưa phân loại'
+                    };
+                })),
+            ...workOrders
+                .filter(wo => wo.status === 'Trả máy' && wo.laborCost > 0)
+                .map(wo => ({
+                    date: wo.creationDate, revenue: wo.laborCost, cost: 0,
+                    partId: 'LABOR', partName: 'Tiền công sửa chữa',
+                    quantity: 1, branchId: wo.branchId, category: 'Dịch vụ'
+                })),
+            ...transactions
+                .filter(tx => tx.type === 'Xuất kho' && tx.saleId)
+                .map(tx => {
+                    const partInfo = parts.find(p => p.id === tx.partId);
+                    return {
+                        date: tx.date, revenue: tx.totalPrice || 0,
+                        cost: (partInfo?.price || 0) * tx.quantity,
+                        partId: tx.partId, partName: tx.partName,
+                        quantity: tx.quantity, branchId: tx.branchId,
+                        category: partInfo?.category || 'Chưa phân loại'
+                    };
+                })
+        ];
+        
+        const filteredSales = allSales.filter(sale => {
             const saleDate = new Date(sale.date);
             return saleDate >= start && saleDate <= end;
         });
 
+        // --- OVERVIEW DATA ---
         const branchData: { [key: string]: { name: string, revenue: number, cost: number, workOrders: number } } = {};
         storeSettings.branches.forEach(b => {
             branchData[b.id] = { name: b.name, revenue: 0, cost: 0, workOrders: 0 };
         });
-        
         const dailyData: { [key: string]: { revenue: number, cost: number } } = {};
 
         filteredSales.forEach(sale => {
@@ -170,7 +193,7 @@ const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ workOrders, transac
                 branchData[sale.branchId].revenue += sale.revenue;
                 branchData[sale.branchId].cost += sale.cost;
             }
-            const dayKey = new Date(sale.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit'});
+            const dayKey = new Date(sale.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
             if (!dailyData[dayKey]) dailyData[dayKey] = { revenue: 0, cost: 0 };
             dailyData[dayKey].revenue += sale.revenue;
             dailyData[dayKey].cost += sale.cost;
@@ -186,7 +209,6 @@ const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ workOrders, transac
         const totalRevenue = Object.values(branchData).reduce((sum, b) => sum + b.revenue, 0);
         const totalCost = Object.values(branchData).reduce((sum, b) => sum + b.cost, 0);
         const totalServices = Object.values(branchData).reduce((sum, b) => sum + b.workOrders, 0);
-
         const salesTrend = Object.entries(dailyData).map(([label, data]) => ({
             label, ...data, profit: data.revenue - data.cost
         })).sort((a,b) => {
@@ -195,79 +217,48 @@ const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ workOrders, transac
             return new Date(`${monthA}/${dayA}/2024`).getTime() - new Date(`${monthB}/${dayB}/2024`).getTime();
         });
 
-        return {
+        const overview = {
             totalRevenue, totalCost, totalProfit: totalRevenue - totalCost, totalServices,
             branchPerformance: Object.values(branchData).map(b => ({...b, profit: b.revenue - b.cost})),
             salesTrend,
         };
-    }, [startDate, endDate, processedSales, workOrders, storeSettings]);
-    
-    const handleAnalyze = async () => {
-        setIsAnalyzing(true);
-        setAnalysis({});
-        const start = new Date(`${startDate}T00:00:00`);
-        const end = new Date(`${endDate}T23:59:59`);
 
-        const analysisPromises = storeSettings.branches.map(async (branch) => {
-            try {
-                const branchSales = processedSales.filter(s => {
-                    const saleDate = new Date(s.date);
-                    return s.branchId === branch.id && saleDate >= start && saleDate <= end;
-                });
-                
-                const { revenue, cost } = reportData.branchPerformance.find(b => b.name === branch.name) || { revenue: 0, cost: 0 };
-                const workOrderCount = workOrders.filter(wo => {
-                     const woDate = new Date(wo.creationDate);
-                     return wo.branchId === branch.id && wo.status === 'Trả máy' && woDate >= start && woDate <= end;
-                }).length;
-                
-                const productPerformance: { [key: string]: { name: string; revenue: number; quantity: number; profit: number } } = {};
-                branchSales.forEach(sale => {
-                    if (sale.partId !== 'LABOR') {
-                        if (!productPerformance[sale.partId]) {
-                            productPerformance[sale.partId] = { name: sale.partName, revenue: 0, quantity: 0, profit: 0 };
-                        }
-                        productPerformance[sale.partId].revenue += sale.revenue;
-                        productPerformance[sale.partId].quantity += sale.quantity;
-                        productPerformance[sale.partId].profit += (sale.revenue - sale.cost);
-                    }
-                });
-                
-                const performanceArray = Object.values(productPerformance);
-                
-                const soldPartIds = new Set(Object.keys(productPerformance));
-                const slowMovingProducts = parts.filter(p => (p.stock[branch.id] || 0) > 0 && !soldPartIds.has(p.id))
-                    .map(p => ({ name: p.name, stock: p.stock[branch.id] }))
-                    .slice(0, 5);
+        // --- ANALYSIS DATA ---
+        const analysis = storeSettings.branches.map(branch => {
+            const branchSales = filteredSales.filter(s => s.branchId === branch.id);
+            const productPerformance: { [key: string]: { name: string; revenue: number; quantity: number; profit: number } } = {};
+            branchSales.forEach(sale => {
+                if (sale.partId !== 'LABOR') {
+                    if (!productPerformance[sale.partId]) productPerformance[sale.partId] = { name: sale.partName, revenue: 0, quantity: 0, profit: 0 };
+                    productPerformance[sale.partId].revenue += sale.revenue;
+                    productPerformance[sale.partId].quantity += sale.quantity;
+                    productPerformance[sale.partId].profit += (sale.revenue - sale.cost);
+                }
+            });
+            const performanceArray = Object.values(productPerformance);
 
-                const dataForAI = {
-                    branchName: branch.name,
-                    period: `${startDate} to ${endDate}`,
-                    financialSummary: { totalRevenue: revenue, totalCost: cost, totalProfit: revenue - cost },
-                    operationalSummary: { totalWorkOrders: workOrderCount },
-                    productPerformance: {
-                        topSellingByRevenue: [...performanceArray].sort((a,b) => b.revenue - a.revenue).slice(0, 5).map(({ name, revenue }) => ({ name, revenue })),
-                        topSellingByQuantity: [...performanceArray].sort((a,b) => b.quantity - a.quantity).slice(0, 5).map(({ name, quantity }) => ({ name, quantity })),
-                        mostProfitableItems: [...performanceArray].sort((a,b) => b.profit - a.profit).slice(0, 5).map(({ name, profit }) => ({ name, profit })),
-                        slowMovingProducts,
-                    }
-                };
-                
-                const analysisText = await getBusinessAnalysis(JSON.stringify(dataForAI, null, 2));
-                return { branchId: branch.id, content: analysisText };
-            } catch (error) {
-                console.error(`Error analyzing branch ${branch.name}:`, error);
-                return { branchId: branch.id, content: '', error: 'Không thể tạo phân tích cho chi nhánh này.' };
-            }
+            const categoryPerformance: { [key: string]: { revenue: number; profit: number } } = {};
+            branchSales.forEach(sale => {
+                const category = sale.category || 'Chưa phân loại';
+                if (!categoryPerformance[category]) categoryPerformance[category] = { revenue: 0, profit: 0 };
+                categoryPerformance[category].revenue += sale.revenue;
+                categoryPerformance[category].profit += (sale.revenue - sale.cost);
+            });
+            const totalBranchRevenue = branchSales.reduce((sum, s) => sum + s.revenue, 0);
+
+            return {
+                branchId: branch.id,
+                branchName: branch.name,
+                topByQuantity: [...performanceArray].sort((a,b) => b.quantity - a.quantity).slice(0, 5),
+                topByProfit: [...performanceArray].sort((a,b) => b.profit - a.profit).slice(0, 5),
+                categoryBreakdown: Object.entries(categoryPerformance)
+                    .map(([name, data]) => ({ name, ...data, percentage: totalBranchRevenue > 0 ? (data.revenue / totalBranchRevenue) * 100 : 0 }))
+                    .sort((a,b) => b.revenue - a.revenue),
+            };
         });
 
-        const results = await Promise.all(analysisPromises);
-        const newAnalysis: Record<string, { content: string; error?: string }> = {};
-        results.forEach(res => { newAnalysis[res.branchId] = { content: res.content, error: res.error }; });
-        setAnalysis(newAnalysis);
-        setIsAnalyzing(false);
-    };
-
+        return { overview, analysis };
+    }, [startDate, endDate, workOrders, transactions, parts, storeSettings.branches]);
 
     const assetValue = useMemo(() => fixedAssets.reduce((sum, a) => sum + a.purchasePrice, 0), [fixedAssets]);
     const inventoryValue = useMemo(() => parts.reduce((sum, p) => {
@@ -304,19 +295,19 @@ const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ workOrders, transac
                 <div className="space-y-6">
                     {/* KPIs */}
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                        <StatCard icon={<BanknotesIcon className="w-6 h-6 text-white"/>} title="Tổng Doanh thu" value={formatCurrency(reportData.totalRevenue)} color="bg-sky-500" />
-                        <StatCard icon={<ChartBarIcon className="w-6 h-6 text-white"/>} title="Tổng Lợi nhuận" value={formatCurrency(reportData.totalProfit)} color="bg-green-500" />
-                        <StatCard icon={<WrenchScrewdriverIcon className="w-6 h-6 text-white"/>} title="Lượt Dịch vụ" value={reportData.totalServices.toString()} color="bg-indigo-500" />
+                        <StatCard icon={<BanknotesIcon className="w-6 h-6 text-white"/>} title="Tổng Doanh thu" value={formatCurrency(processedData.overview.totalRevenue)} color="bg-sky-500" />
+                        <StatCard icon={<ChartBarIcon className="w-6 h-6 text-white"/>} title="Tổng Lợi nhuận" value={formatCurrency(processedData.overview.totalProfit)} color="bg-green-500" />
+                        <StatCard icon={<WrenchScrewdriverIcon className="w-6 h-6 text-white"/>} title="Lượt Dịch vụ" value={processedData.overview.totalServices.toString()} color="bg-indigo-500" />
                         <StatCard icon={<BuildingLibraryIcon className="w-6 h-6 text-white"/>} title="Giá trị Tài sản & Tồn kho" value={formatCurrency(assetValue + inventoryValue)} color="bg-violet-500" />
                     </div>
 
                     {/* Charts */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="lg:col-span-2">
-                            <SalesTrendChart data={reportData.salesTrend} />
+                            <SalesTrendChart data={processedData.overview.salesTrend} />
                         </div>
                         <div className="lg:col-span-1">
-                            <BranchPerformanceChart data={reportData.branchPerformance} />
+                            <BranchPerformanceChart data={processedData.overview.branchPerformance} />
                         </div>
                     </div>
                 </div>
@@ -324,60 +315,43 @@ const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ workOrders, transac
             
             {activeTab === 'analysis' && (
                 <div className="space-y-6">
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200/60 dark:border-slate-700 text-center">
-                        <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Phân tích Kinh doanh bằng AI</h2>
-                        <p className="text-slate-600 dark:text-slate-400 mt-2 max-w-2xl mx-auto">Sử dụng AI để phân tích dữ liệu trong khoảng thời gian đã chọn và đưa ra các đề xuất cải thiện cho từng chi nhánh.</p>
-                        <button 
-                            onClick={handleAnalyze} 
-                            disabled={isAnalyzing}
-                            className="mt-4 flex items-center justify-center mx-auto bg-indigo-600 text-white font-semibold py-2 px-6 rounded-lg shadow-sm hover:bg-indigo-700 transition-colors disabled:bg-indigo-300"
-                        >
-                            {isAnalyzing ? (
-                                <>
-                                    <LoadingSpinner />
-                                    <span>Đang phân tích...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <SparklesIcon className="w-5 h-5 mr-2"/>
-                                    Bắt đầu Phân tích
-                                </>
-                            )}
-                        </button>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {processedData.analysis.map(data => (
+                            <div key={data.branchId} className="space-y-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg">
+                                <h2 className="text-xl font-bold text-center text-slate-800 dark:text-slate-100">{data.branchName}</h2>
+                                
+                                <AnalysisCard title="Top 5 sản phẩm bán chạy (Số lượng)">
+                                    {data.topByQuantity.length > 0 ? (
+                                        <div>
+                                            {data.topByQuantity.map(item => (
+                                                <ListItem key={item.name} label={item.name} value={`${item.quantity} sp`} subValue={formatCurrency(item.revenue)} />
+                                            ))}
+                                        </div>
+                                    ) : <p className="text-sm text-slate-500 dark:text-slate-400">Không có dữ liệu.</p>}
+                                </AnalysisCard>
+
+                                <AnalysisCard title="Top 5 sản phẩm lợi nhuận cao nhất">
+                                     {data.topByProfit.length > 0 ? (
+                                        <div>
+                                            {data.topByProfit.map(item => (
+                                                <ListItem key={item.name} label={item.name} value={formatCurrency(item.profit)} subValue={`${item.quantity} sp`} />
+                                            ))}
+                                        </div>
+                                     ) : <p className="text-sm text-slate-500 dark:text-slate-400">Không có dữ liệu.</p>}
+                                </AnalysisCard>
+
+                                <AnalysisCard title="Phân tích doanh thu theo danh mục">
+                                     {data.categoryBreakdown.length > 0 ? (
+                                        <div className="space-y-3">
+                                            {data.categoryBreakdown.map(item => (
+                                                <CategoryItem key={item.name} name={item.name} revenue={item.revenue} percentage={item.percentage} />
+                                            ))}
+                                        </div>
+                                     ) : <p className="text-sm text-slate-500 dark:text-slate-400">Không có dữ liệu.</p>}
+                                </AnalysisCard>
+                            </div>
+                        ))}
                     </div>
-
-                    {isAnalyzing && (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {storeSettings.branches.map(branch => (
-                                <div key={branch.id} className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border dark:border-slate-700">
-                                    <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4">{branch.name}</h3>
-                                    <div className="animate-pulse space-y-4">
-                                        <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/4"></div>
-                                        <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-full"></div>
-                                        <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-5/6"></div>
-                                        <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/3 mt-6"></div>
-                                        <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-full"></div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {Object.keys(analysis).length > 0 && !isAnalyzing && (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {storeSettings.branches.map(branch => (
-                                <div key={branch.id} className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200/60 dark:border-slate-700">
-                                    <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-4">Phân tích cho: {branch.name}</h3>
-                                    {analysis[branch.id]?.error ? (
-                                        <p className="text-red-500">{analysis[branch.id].error}</p>
-                                    ) : (
-                                        <div className="prose prose-sm prose-slate dark:prose-invert max-w-none"
-                                             dangerouslySetInnerHTML={{ __html: analysis[branch.id]?.content.replace(/\n/g, '<br />').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') || '' }} />
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
                 </div>
             )}
         </div>
