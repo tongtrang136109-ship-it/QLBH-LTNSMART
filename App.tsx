@@ -11,11 +11,12 @@ import SalesManager from './components/SalesManager';
 import UserManager from './components/UserManager';
 import RevenueReport from './components/RevenueReport';
 import InventoryReport from './components/InventoryReport';
-import type { Part, Customer, InventoryTransaction, WorkOrder, CartItem, User, StoreSettings, Supplier, PaymentSource, CashTransaction, Department } from './types';
+import type { Part, Customer, InventoryTransaction, WorkOrder, CartItem, User, StoreSettings, Supplier, PaymentSource, CashTransaction, Department, FixedAsset, CapitalInvestment } from './types';
 import Header from './components/common/Header';
 import Login from './components/Login';
 import CreateGoodsReceipt from './components/CreateGoodsReceipt';
 import CashflowManager from './components/CashflowManager';
+import AssetManager from './components/AssetManager';
 
 // Mock data moved here for centralized state management
 const mockWorkOrdersData: WorkOrder[] = [
@@ -37,7 +38,10 @@ const mockWorkOrdersData: WorkOrder[] = [
         partsUsed: [
             { partId: 'P002', partName: 'Nhớt Motul 300V', sku: 'MOTUL-300V-1L', quantity: 1, price: 450000 }
         ],
-        notes: 'Khách yêu cầu kiểm tra thêm hệ thống điện và sạc.'
+        notes: 'Khách yêu cầu kiểm tra thêm hệ thống điện và sạc.',
+        paymentStatus: 'paid',
+        paymentMethod: 'cash',
+        paymentDate: '2024-07-30',
     },
     { 
         id: 'S002', 
@@ -57,7 +61,8 @@ const mockWorkOrdersData: WorkOrder[] = [
         partsUsed: [
              { partId: 'P004', partName: 'Má phanh Bendix', sku: 'BENDIX-MD27', quantity: 1, price: 120000 }
         ],
-        notes: 'Cần thay má phanh gấp.'
+        notes: 'Cần thay má phanh gấp.',
+        paymentStatus: 'unpaid',
     },
 ];
 
@@ -164,11 +169,16 @@ const mockSuppliersData: Supplier[] = [
 ];
 
 const mockPaymentSourcesData: PaymentSource[] = [
-    { id: 'cash', name: 'Tiền mặt', balance: 14373238, isDefault: true },
-    { id: 'bank', name: 'Tài khoản ngân hàng', balance: 50000000 },
+    { id: 'cash', name: 'Tiền mặt', balance: { main: 10000000, q2: 4373238 }, isDefault: true },
+    { id: 'bank', name: 'Tài khoản ngân hàng', balance: { main: 40000000, q2: 10000000 } },
 ];
 
 const mockCashTransactionsData: CashTransaction[] = [];
+
+const mockCapitalInvestmentsData: CapitalInvestment[] = [
+    { id: 'CAP001', date: '2023-01-10', amount: 200000000, description: 'Vốn góp ban đầu', source: 'Vốn chủ sở hữu', branchId: 'main' },
+    { id: 'CAP002', date: '2023-05-20', amount: 150000000, description: 'Vay ngân hàng Techcombank mua máy móc', source: 'Vay ngân hàng', interestRate: 8.5, branchId: 'main' },
+];
 
 
 // Custom hook to manage state with localStorage
@@ -210,6 +220,9 @@ const App: React.FC = () => {
   const [suppliers, setSuppliers] = useLocalStorageState<Supplier[]>('motocare_suppliers', mockSuppliersData);
   const [paymentSources, setPaymentSources] = useLocalStorageState<PaymentSource[]>('motocare_paymentSources', mockPaymentSourcesData);
   const [cashTransactions, setCashTransactions] = useLocalStorageState<CashTransaction[]>('motocare_cashTransactions', mockCashTransactionsData);
+  const [fixedAssets, setFixedAssets] = useLocalStorageState<FixedAsset[]>('motocare_fixedAssets', []);
+  const [capitalInvestments, setCapitalInvestments] = useLocalStorageState<CapitalInvestment[]>('motocare_capitalInvestments', mockCapitalInvestmentsData);
+
   const [theme, setTheme] = useLocalStorageState<Theme>('motocare_theme', 'system');
   
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -311,8 +324,23 @@ const App: React.FC = () => {
           <main className="flex-1 overflow-y-auto p-6 lg:p-8">
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard workOrders={workOrders} transactions={transactions} parts={parts} currentBranchId={currentBranchId} />} />
-              <Route path="/services" element={<ServiceManager currentUser={currentUser} workOrders={workOrders} setWorkOrders={setWorkOrders} parts={parts} storeSettings={storeSettings} currentBranchId={currentBranchId} customers={customers} setCustomers={setCustomers} users={users} departments={departments} />} />
+              <Route path="/dashboard" element={<Dashboard workOrders={workOrders} transactions={transactions} parts={parts} currentBranchId={currentBranchId} paymentSources={paymentSources} />} />
+              <Route path="/services" element={<ServiceManager 
+                currentUser={currentUser} 
+                workOrders={workOrders} 
+                setWorkOrders={setWorkOrders} 
+                parts={parts} 
+                storeSettings={storeSettings} 
+                currentBranchId={currentBranchId} 
+                customers={customers} 
+                setCustomers={setCustomers} 
+                users={users} 
+                departments={departments} 
+                paymentSources={paymentSources}
+                setPaymentSources={setPaymentSources}
+                cashTransactions={cashTransactions}
+                setCashTransactions={setCashTransactions}
+              />} />
               <Route path="/sales" element={<SalesManager 
                 currentUser={currentUser}
                 workOrders={workOrders} 
@@ -326,6 +354,10 @@ const App: React.FC = () => {
                 currentBranchId={currentBranchId}
                 customers={customers}
                 setCustomers={setCustomers}
+                paymentSources={paymentSources}
+                setPaymentSources={setPaymentSources}
+                cashTransactions={cashTransactions}
+                setCashTransactions={setCashTransactions}
               />} />
               <Route path="/inventory" element={<InventoryManager currentUser={currentUser} parts={parts} setParts={setParts} transactions={transactions} setTransactions={setTransactions} currentBranchId={currentBranchId} storeSettings={storeSettings} />} />
               <Route path="/inventory/goods-receipt/new" element={<CreateGoodsReceipt 
@@ -349,6 +381,14 @@ const App: React.FC = () => {
                 suppliers={suppliers}
                 setSuppliers={setSuppliers}
                 currentBranchId={currentBranchId}
+                storeSettings={storeSettings}
+              />} />
+              <Route path="/assets" element={<AssetManager 
+                  fixedAssets={fixedAssets}
+                  setFixedAssets={setFixedAssets}
+                  capitalInvestments={capitalInvestments}
+                  setCapitalInvestments={setCapitalInvestments}
+                  storeSettings={storeSettings}
               />} />
               <Route path="/ai-assistant" element={<AiAssistant />} />
               <Route path="/users" element={<UserManager currentUser={currentUser} users={users} setUsers={setUsers} departments={departments} setDepartments={setDepartments} />} />
