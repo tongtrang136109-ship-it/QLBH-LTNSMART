@@ -10,11 +10,13 @@ import SalesManager from './components/SalesManager';
 import UserManager from './components/UserManager';
 import RevenueReport from './components/RevenueReport';
 import InventoryReport from './components/InventoryReport';
-import type { Part, Customer, InventoryTransaction, WorkOrder, CartItem, User, StoreSettings, Supplier, PaymentSource, CashTransaction, Department } from './types';
+import type { Part, Customer, InventoryTransaction, WorkOrder, CartItem, User, StoreSettings, Supplier, PaymentSource, CashTransaction, Department, FixedAsset, CapitalInvestment } from './types';
 import Header from './components/common/Header';
 import Login from './components/Login';
 import CreateGoodsReceipt from './components/CreateGoodsReceipt';
 import CashflowManager from './components/CashflowManager';
+import AssetManager from './components/AssetManager';
+import ExecutiveSummary from './components/ExecutiveSummary';
 
 // Mock data moved here for centralized state management
 const mockWorkOrdersData: WorkOrder[] = [
@@ -26,7 +28,7 @@ const mockWorkOrdersData: WorkOrder[] = [
         vehicleModel: 'Honda Air Blade', 
         licensePlate: '59-A1 123.45',
         issueDescription: 'Bảo dưỡng định kỳ, thay nhớt',
-        technicianName: 'Trần Văn An',
+        technicianName: 'Lê Minh Kỹ Thuật',
         status: 'Trả máy', 
         total: 580000,
         branchId: 'main',
@@ -37,8 +39,9 @@ const mockWorkOrdersData: WorkOrder[] = [
             { partId: 'P002', partName: 'Nhớt Motul 300V', sku: 'MOTUL-300V-1L', quantity: 1, price: 450000 }
         ],
         notes: 'Khách yêu cầu kiểm tra thêm hệ thống điện và sạc.',
-        odometerReading: 10000,
-        serviceTypes: ['Bảo dưỡng định kỳ', 'Thay nhớt']
+        paymentStatus: 'paid',
+        paymentMethod: 'cash',
+        paymentDate: '2024-07-30',
     },
     { 
         id: 'S002', 
@@ -48,7 +51,7 @@ const mockWorkOrdersData: WorkOrder[] = [
         vehicleModel: 'Yamaha Exciter',
         licensePlate: '72-B2 678.90',
         issueDescription: 'Phanh sau không ăn, có tiếng kêu',
-        technicianName: 'Lê Minh Bảo',
+        technicianName: 'Lê Minh Kỹ Thuật',
         status: 'Đang sửa', 
         total: 120000,
         branchId: 'main',
@@ -59,28 +62,7 @@ const mockWorkOrdersData: WorkOrder[] = [
              { partId: 'P004', partName: 'Má phanh Bendix', sku: 'BENDIX-MD27', quantity: 1, price: 120000 }
         ],
         notes: 'Cần thay má phanh gấp.',
-        odometerReading: 25000,
-        serviceTypes: ['Sửa chữa chung']
-    },
-    { 
-        id: 'S003', 
-        creationDate: '2024-08-15', // A later service
-        customerName: 'Nguyễn Văn A', 
-        customerPhone: '0901234567',
-        vehicleModel: 'Honda Air Blade', 
-        licensePlate: '59-A1 123.45',
-        issueDescription: 'Sửa đèn xi-nhan sau',
-        technicianName: 'Trần Văn An',
-        status: 'Trả máy', 
-        total: 80000,
-        branchId: 'main',
-        laborCost: 80000,
-        processingType: 'Sửa trực tiếp',
-        customerQuote: 80000,
-        partsUsed: [],
-        notes: 'Đã thay bóng đèn mới.',
-        odometerReading: 11750, // This reading will trigger the alert
-        serviceTypes: ['Sửa chữa chung']
+        paymentStatus: 'unpaid',
     },
 ];
 
@@ -94,7 +76,7 @@ const mockPartsData: Part[] = [
 ];
 
 const mockCustomersData: Customer[] = [
-    { id: 'C001', name: 'Nguyễn Văn A', phone: '0901234567', vehicle: 'Honda Air Blade 2022', licensePlate: '59-A1 123.45', loyaltyPoints: 150, lastServiceOdometer: 10000, lastServiceDate: '2024-07-30' },
+    { id: 'C001', name: 'Nguyễn Văn A', phone: '0901234567', vehicle: 'Honda Air Blade 2022', licensePlate: '59-A1 123.45', loyaltyPoints: 150 },
     { id: 'C002', name: 'Trần Thị B', phone: '0987654321', vehicle: 'Yamaha Exciter 155', licensePlate: '72-B2 678.90', loyaltyPoints: 320 },
     { id: 'C003', name: 'Lê Hoàng Long', phone: '0912345678', vehicle: 'Honda SH 150i', licensePlate: '29-C1 555.55', loyaltyPoints: 80 },
 ];
@@ -187,11 +169,16 @@ const mockSuppliersData: Supplier[] = [
 ];
 
 const mockPaymentSourcesData: PaymentSource[] = [
-    { id: 'cash', name: 'Tiền mặt', balance: 14373238, isDefault: true },
-    { id: 'bank', name: 'Tài khoản ngân hàng', balance: 50000000 },
+    { id: 'cash', name: 'Tiền mặt', balance: { main: 10000000, q2: 4373238 }, isDefault: true },
+    { id: 'bank', name: 'Tài khoản ngân hàng', balance: { main: 40000000, q2: 10000000 } },
 ];
 
 const mockCashTransactionsData: CashTransaction[] = [];
+
+const mockCapitalInvestmentsData: CapitalInvestment[] = [
+    { id: 'CAP001', date: '2023-01-10', amount: 200000000, description: 'Vốn góp ban đầu', source: 'Vốn chủ sở hữu', branchId: 'main' },
+    { id: 'CAP002', date: '2023-05-20', amount: 150000000, description: 'Vay ngân hàng Techcombank mua máy móc', source: 'Vay ngân hàng', interestRate: 8.5, branchId: 'main' },
+];
 
 
 // Custom hook to manage state with localStorage
@@ -233,6 +220,9 @@ const App: React.FC = () => {
   const [suppliers, setSuppliers] = useLocalStorageState<Supplier[]>('motocare_suppliers', mockSuppliersData);
   const [paymentSources, setPaymentSources] = useLocalStorageState<PaymentSource[]>('motocare_paymentSources', mockPaymentSourcesData);
   const [cashTransactions, setCashTransactions] = useLocalStorageState<CashTransaction[]>('motocare_cashTransactions', mockCashTransactionsData);
+  const [fixedAssets, setFixedAssets] = useLocalStorageState<FixedAsset[]>('motocare_fixedAssets', []);
+  const [capitalInvestments, setCapitalInvestments] = useLocalStorageState<CapitalInvestment[]>('motocare_capitalInvestments', mockCapitalInvestmentsData);
+
   const [theme, setTheme] = useLocalStorageState<Theme>('motocare_theme', 'system');
   
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -302,6 +292,9 @@ const App: React.FC = () => {
   if (!isAuthenticated || !currentUser) {
     return <Login onLogin={handleLogin} />;
   }
+  
+  const userDepartments = currentUser.departmentIds.map(id => departments.find(d => d.id === id)).filter((d): d is Department => !!d);
+  const isAdmin = userDepartments.some(d => d.name === 'Quản trị');
 
   return (
     <HashRouter>
@@ -334,8 +327,23 @@ const App: React.FC = () => {
           <main className="flex-1 overflow-y-auto p-6 lg:p-8">
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard workOrders={workOrders} customers={customers} parts={parts} currentBranchId={currentBranchId} />} />
-              <Route path="/services" element={<ServiceManager currentUser={currentUser} workOrders={workOrders} setWorkOrders={setWorkOrders} parts={parts} storeSettings={storeSettings} currentBranchId={currentBranchId} customers={customers} setCustomers={setCustomers} />} />
+              <Route path="/dashboard" element={<Dashboard workOrders={workOrders} transactions={transactions} parts={parts} currentBranchId={currentBranchId} paymentSources={paymentSources} />} />
+              <Route path="/services" element={<ServiceManager 
+                currentUser={currentUser} 
+                workOrders={workOrders} 
+                setWorkOrders={setWorkOrders} 
+                parts={parts} 
+                storeSettings={storeSettings} 
+                currentBranchId={currentBranchId} 
+                customers={customers} 
+                setCustomers={setCustomers} 
+                users={users} 
+                departments={departments} 
+                paymentSources={paymentSources}
+                setPaymentSources={setPaymentSources}
+                cashTransactions={cashTransactions}
+                setCashTransactions={setCashTransactions}
+              />} />
               <Route path="/sales" element={<SalesManager 
                 currentUser={currentUser}
                 workOrders={workOrders} 
@@ -349,6 +357,10 @@ const App: React.FC = () => {
                 currentBranchId={currentBranchId}
                 customers={customers}
                 setCustomers={setCustomers}
+                paymentSources={paymentSources}
+                setPaymentSources={setPaymentSources}
+                cashTransactions={cashTransactions}
+                setCashTransactions={setCashTransactions}
               />} />
               <Route path="/inventory" element={<InventoryManager currentUser={currentUser} parts={parts} setParts={setParts} transactions={transactions} setTransactions={setTransactions} currentBranchId={currentBranchId} storeSettings={storeSettings} />} />
               <Route path="/inventory/goods-receipt/new" element={<CreateGoodsReceipt 
@@ -360,6 +372,10 @@ const App: React.FC = () => {
                   setSuppliers={setSuppliers}
                   storeSettings={storeSettings}
                   currentBranchId={currentBranchId}
+                  paymentSources={paymentSources}
+                  setPaymentSources={setPaymentSources}
+                  cashTransactions={cashTransactions}
+                  setCashTransactions={setCashTransactions}
               />} />
               <Route path="/customers" element={<CustomerManager customers={customers} setCustomers={setCustomers} />} />
               <Route path="/cashflow" element={<CashflowManager 
@@ -368,13 +384,31 @@ const App: React.FC = () => {
                 paymentSources={paymentSources}
                 setPaymentSources={setPaymentSources}
                 customers={customers}
-                setCustomers={setCustomers}
                 suppliers={suppliers}
-                setSuppliers={setSuppliers}
                 currentBranchId={currentBranchId}
+                storeSettings={storeSettings}
+              />} />
+              <Route path="/assets" element={<AssetManager 
+                  fixedAssets={fixedAssets}
+                  setFixedAssets={setFixedAssets}
+                  capitalInvestments={capitalInvestments}
+                  setCapitalInvestments={setCapitalInvestments}
+                  storeSettings={storeSettings}
               />} />
               <Route path="/ai-assistant" element={<AiAssistant />} />
               <Route path="/users" element={<UserManager currentUser={currentUser} users={users} setUsers={setUsers} departments={departments} setDepartments={setDepartments} />} />
+              <Route path="/reports/summary" element={
+                isAdmin 
+                ? <ExecutiveSummary
+                    workOrders={workOrders}
+                    transactions={transactions}
+                    parts={parts}
+                    storeSettings={storeSettings}
+                    fixedAssets={fixedAssets}
+                    capitalInvestments={capitalInvestments}
+                  />
+                : <Navigate to="/dashboard" replace />
+               } />
               <Route path="/reports/revenue" element={<RevenueReport workOrders={workOrders} transactions={transactions} parts={parts} currentBranchId={currentBranchId} />} />
               <Route path="/reports/inventory" element={<InventoryReport parts={parts} transactions={transactions} currentBranchId={currentBranchId} storeSettings={storeSettings} />} />
             </Routes>

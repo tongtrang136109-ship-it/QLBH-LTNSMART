@@ -329,11 +329,21 @@ const UserModal: React.FC<{
     onSave: (user: User) => void;
     departments: Department[];
     users: User[];
-}> = ({ user, onClose, onSave, departments, users }) => {
+    currentUser: User;
+}> = ({ user, onClose, onSave, departments, users, currentUser }) => {
     const [step, setStep] = useState(1);
     const [loginPhone, setLoginPhone] = useState('');
     const [formData, setFormData] = useState<Partial<User>>({});
     const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmNewPassword, setConfirmNewPassword] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+    
+    const isEditingAdmin = useMemo(() => {
+        if (!user) return false;
+        // Check if the user being edited is an admin
+        return departments.some(d => user.departmentIds.includes(d.id) && d.name === 'Quản trị');
+    }, [user, departments]);
 
 
     useEffect(() => {
@@ -347,6 +357,9 @@ const UserModal: React.FC<{
             setStep(1);
         }
         setIsChangePasswordOpen(false);
+        setNewPassword('');
+        setConfirmNewPassword('');
+        setPasswordError('');
     }, [user]);
 
     const handleNextStep = () => {
@@ -373,17 +386,28 @@ const UserModal: React.FC<{
             return;
         }
     
-        // Check for uniqueness, excluding the current user being edited
         if (users.some(u => u.loginPhone === formData.loginPhone?.trim() && u.id !== formData.id)) {
             alert('Số điện thoại này đã được sử dụng bởi một nhân viên khác.');
             return;
+        }
+        
+        if (!user) { // This is a new user
+            setPasswordError('');
+            if (!newPassword || newPassword.length < 6) {
+                setPasswordError('Mật khẩu phải có ít nhất 6 ký tự.');
+                return;
+            }
+            if (newPassword !== confirmNewPassword) {
+                setPasswordError('Mật khẩu xác nhận không khớp.');
+                return;
+            }
         }
         
         const finalData: User = {
             id: formData.id || `U${Date.now()}`,
             name: formData.name,
             loginPhone: formData.loginPhone!,
-            password: formData.password || 'password123', // Default password for new users
+            password: formData.id ? formData.password! : newPassword,
             status: formData.status || 'active',
             departmentIds: formData.departmentIds || [],
             creationDate: formData.creationDate || new Date().toISOString().split('T')[0],
@@ -396,6 +420,9 @@ const UserModal: React.FC<{
             setFormData({ status: 'active', departmentIds: [] });
             setLoginPhone('');
             setStep(1);
+            setNewPassword('');
+            setConfirmNewPassword('');
+            setPasswordError('');
         } else {
             onClose();
         }
@@ -419,7 +446,6 @@ const UserModal: React.FC<{
                     <button onClick={onClose} className="text-white opacity-70 hover:opacity-100"><XMarkIcon className="w-6 h-6" /></button>
                 </div>
                 
-                {/* Stepper */}
                 <div className="flex p-4 border-b dark:border-slate-700">
                     <div className="flex items-center">
                         <CheckCircleIcon className={`w-6 h-6 ${step >= 1 ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'}`}/>
@@ -464,10 +490,31 @@ const UserModal: React.FC<{
                                     <label><input type="radio" name="status" value="inactive" checked={formData.status === 'inactive'} onChange={() => setFormData(d => ({...d, status: 'inactive'}))} className="mr-1"/> Bị khoá</label>
                                 </div>
                             </div>
+                            
+                            {!user && (
+                                <>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Mật khẩu (*)</label>
+                                        <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="mt-1 w-full p-2 border dark:border-slate-600 rounded-md dark:bg-slate-700 dark:text-white" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Xác nhận mật khẩu (*)</label>
+                                        <input type="password" value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} className="mt-1 w-full p-2 border dark:border-slate-600 rounded-md dark:bg-slate-700 dark:text-white" />
+                                    </div>
+                                    {passwordError && <p className="text-sm text-red-500">{passwordError}</p>}
+                                </>
+                            )}
+
                             {user && (
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Mật khẩu</label>
-                                    <button type="button" onClick={() => setIsChangePasswordOpen(true)} className="mt-1 text-sm text-sky-600 dark:text-sky-400 hover:underline font-medium">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setIsChangePasswordOpen(true)} 
+                                        disabled={isEditingAdmin}
+                                        title={isEditingAdmin ? "Không thể thay đổi mật khẩu của Quản trị viên." : "Đặt lại mật khẩu"}
+                                        className="mt-1 text-sm text-sky-600 dark:text-sky-400 hover:underline font-medium disabled:text-slate-400 disabled:cursor-not-allowed disabled:no-underline"
+                                    >
                                         Đặt lại mật khẩu
                                     </button>
                                 </div>
@@ -585,7 +632,7 @@ const UserManager: React.FC<UserManagerProps> = ({ currentUser, users, setUsers,
     return (
         <div className="space-y-6">
             {isColumnSelectorOpen && <ColumnSelectorModal visibleColumns={visibleColumns} onApply={setVisibleColumns} onClose={() => setIsColumnSelectorOpen(false)} />}
-            {isUserModalOpen && <UserModal user={editingUser} onClose={() => { setIsUserModalOpen(false); setEditingUser(null); }} onSave={handleSaveUser} departments={departments} users={users} />}
+            {isUserModalOpen && <UserModal user={editingUser} onClose={() => { setIsUserModalOpen(false); setEditingUser(null); }} onSave={handleSaveUser} departments={departments} users={users} currentUser={currentUser} />}
             {isDepartmentsModalOpen && <DepartmentsListModal departments={departments} onClose={() => setIsDepartmentsModalOpen(false)} onSave={handleSaveDepartment} onDelete={handleDeleteDepartment} />}
             
             <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 flex flex-col sm:flex-row justify-between sm:items-center gap-4">

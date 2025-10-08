@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { WorkOrder, Part, User, StoreSettings, WorkOrderPart, Customer, QuotationItem } from '../types';
-import { PlusIcon, PencilSquareIcon, TrashIcon, PrinterIcon, XMarkIcon, ChevronDownIcon, ArrowUturnLeftIcon } from './common/Icons';
+import type { WorkOrder, Part, User, StoreSettings, WorkOrderPart, Customer, QuotationItem, Department, PaymentSource, CashTransaction } from '../types';
+import { PlusIcon, PencilSquareIcon, TrashIcon, PrinterIcon, XMarkIcon, ChevronDownIcon, ExclamationTriangleIcon } from './common/Icons';
 import Pagination from './common/Pagination';
 
 // Helper to format currency
@@ -8,26 +9,35 @@ const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 };
 
+// Helper to format currency inputs for better UX
+const formatCurrencyInput = (value: number | string): string => {
+    const num = Number(String(value).replace(/[^0-9]/g, ''));
+    if (isNaN(num) || num === 0) return '';
+    return new Intl.NumberFormat('vi-VN').format(num);
+};
+
+const parseCurrencyInput = (value: string): number => {
+    return Number(String(value).replace(/[^0-9]/g, '')) || 0;
+};
+
+
 const NewCustomerModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
     onSave: (customer: Customer) => void;
     initialName?: string;
 }> = ({ isOpen, onClose, onSave, initialName = '' }) => {
-    const [formData, setFormData] = useState<Omit<Customer, 'id' | 'loyaltyPoints' | 'lastServiceDate'>>({ name: initialName, phone: '', vehicle: '', licensePlate: '', lastServiceOdometer: undefined });
+    const [formData, setFormData] = useState<Omit<Customer, 'id' | 'loyaltyPoints'>>({ name: initialName, phone: '', vehicle: '', licensePlate: '' });
     
     React.useEffect(() => {
         if(isOpen) {
-            setFormData({ name: initialName, phone: '', vehicle: '', licensePlate: '', lastServiceOdometer: undefined });
+            setFormData({ name: initialName, phone: '', vehicle: '', licensePlate: '' });
         }
     }, [isOpen, initialName]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value, type } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: type === 'number' ? (value === '' ? undefined : parseInt(value, 10)) : value
-        }));
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -36,7 +46,6 @@ const NewCustomerModal: React.FC<{
             id: `C${Date.now()}`,
             ...formData,
             loyaltyPoints: 0,
-            lastServiceDate: formData.lastServiceOdometer ? new Date().toISOString().split('T')[0] : undefined,
         };
         onSave(finalCustomer);
     };
@@ -68,17 +77,10 @@ const NewCustomerModal: React.FC<{
                                     <input id="new-customer-licensePlate" type="text" name="licensePlate" value={formData.licensePlate} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
                                 </div>
                             </div>
-                            <div>
-                                <label htmlFor="new-customer-odometer" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Số ODO (km)</label>
-                                <input id="new-customer-odometer" type="number" name="lastServiceOdometer" value={formData.lastServiceOdometer || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
-                            </div>
                         </div>
                     </div>
                     <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 flex justify-end space-x-3 border-t border-slate-200 dark:border-slate-700">
-                        <button type="button" onClick={onClose} className="flex items-center gap-2 bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">
-                            <ArrowUturnLeftIcon className="w-5 h-5" />
-                            Trở về
-                        </button>
+                        <button type="button" onClick={onClose} className="bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">Hủy</button>
                         <button type="submit" className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700">Lưu</button>
                     </div>
                 </form>
@@ -87,25 +89,62 @@ const NewCustomerModal: React.FC<{
     );
 };
 
+// Wrapper for consistent section styling, now with accordion functionality for mobile
+const SectionWrapper: React.FC<{ 
+    title: string; 
+    children: React.ReactNode; 
+    className?: string;
+    id: string;
+    activeId: string | null;
+    setActiveId: (id: string | null) => void;
+}> = ({ title, children, className = '', id, activeId, setActiveId }) => {
+    const isOpen = activeId === id;
+
+    const handleToggle = () => {
+        // This function will be attached to the header. We can use CSS to disable pointer events on desktop.
+        setActiveId(isOpen ? null : id);
+    };
+
+    return (
+        <div className={className}>
+            <h3 
+                className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-3 pb-2 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center cursor-pointer lg:cursor-auto"
+                onClick={handleToggle}
+            >
+                {title}
+                <ChevronDownIcon className={`w-5 h-5 transition-transform lg:hidden ${isOpen ? 'rotate-180' : ''}`} />
+            </h3>
+            <div className={`space-y-4 lg:!block ${isOpen ? 'block' : 'hidden'}`}>
+                {children}
+            </div>
+        </div>
+    );
+};
+
+
 // --- WorkOrder Modal for Processing/Editing ---
 const WorkOrderModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
-    onSave: (workOrder: WorkOrder) => void;
+    onSave: (workOrder: WorkOrder, newTransaction?: CashTransaction) => void;
     workOrder: WorkOrder | null;
     parts: Part[];
     currentBranchId: string;
     customers: Customer[];
     setCustomers: React.Dispatch<React.SetStateAction<Customer[]>>;
-}> = ({ isOpen, onClose, onSave, workOrder, parts, currentBranchId, customers, setCustomers }) => {
+    workOrders: WorkOrder[];
+    users: User[];
+    departments: Department[];
+    paymentSources: PaymentSource[];
+}> = ({ isOpen, onClose, onSave, workOrder, parts, currentBranchId, customers, setCustomers, workOrders, users, departments, paymentSources }) => {
     const [formData, setFormData] = useState<Omit<WorkOrder, 'id' | 'creationDate' | 'total'>>(() => {
         const defaults = {
             customerName: '', customerPhone: '', vehicleModel: '', licensePlate: '', issueDescription: '',
             technicianName: '', status: 'Tiếp nhận' as const, laborCost: 0, partsUsed: [], quotationItems: [], notes: '',
             branchId: currentBranchId,
             discount: 0,
-            odometerReading: 0,
-            serviceTypes: [],
+            mileage: undefined,
+            paymentStatus: 'unpaid' as const
         };
         return workOrder ? { ...workOrder } : defaults;
     });
@@ -115,28 +154,16 @@ const WorkOrderModal: React.FC<{
     const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
     const [newQuoteItem, setNewQuoteItem] = useState({ description: '', quantity: 1, unitPrice: 0 });
     const customerInputRef = useRef<HTMLDivElement>(null);
-    const [openSections, setOpenSections] = useState<string[]>(['customerInfo']);
-    const serviceTypesOptions = ['Thay nhớt', 'Bảo dưỡng định kỳ', 'Sửa chữa chung', 'Tân trang'];
+    const [oilChangeWarning, setOilChangeWarning] = useState<string | null>(null);
+    const [activeSection, setActiveSection] = useState<string | null>('customer');
 
-    const toggleSection = (sectionId: string) => {
-        setOpenSections(prev => 
-            prev.includes(sectionId) ? prev.filter(id => id !== sectionId) : [...prev, sectionId]
-        );
-    };
-
-    const AccordionSection: React.FC<{ title: string; id: string; children: React.ReactNode; }> = ({ title, id, children }) => {
-        const isOpen = openSections.includes(id);
-        return (
-            <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                <button type="button" onClick={() => toggleSection(id)} className="w-full flex justify-between items-center p-4 bg-slate-50/50 dark:bg-slate-800/50 hover:bg-slate-100/50 dark:hover:bg-slate-700/50 transition-colors">
-                    <h3 className="font-semibold text-lg text-slate-700 dark:text-slate-200">{title}</h3>
-                    <ChevronDownIcon className={`w-6 h-6 text-slate-500 dark:text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                </button>
-                {isOpen && <div className="p-4 border-t border-slate-200 dark:border-slate-700">{children}</div>}
-            </div>
-        );
-    };
-
+    const [partSearchTerm, setPartSearchTerm] = useState('');
+    const [isPartListOpen, setIsPartListOpen] = useState(false);
+    const partInputRef = useRef<HTMLDivElement>(null);
+    
+    // Payment State
+    const [isPaid, setIsPaid] = useState(workOrder?.paymentStatus === 'paid');
+    const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank'>(workOrder?.paymentMethod || 'cash');
 
     const getStatusColorClass = (status: WorkOrder['status']) => {
         switch (status) {
@@ -154,45 +181,65 @@ const WorkOrderModal: React.FC<{
             technicianName: '', status: 'Tiếp nhận' as const, laborCost: 0, partsUsed: [], quotationItems: [], notes: '',
             branchId: currentBranchId,
             discount: 0,
-            odometerReading: 0,
-            serviceTypes: [],
+            mileage: undefined,
+            paymentStatus: 'unpaid' as const,
         };
-        setFormData(workOrder ? { ...workOrder, quotationItems: workOrder.quotationItems || [], serviceTypes: workOrder.serviceTypes || [] } : defaults);
+        setFormData(workOrder ? { ...workOrder, quotationItems: workOrder.quotationItems || [] } : defaults);
         setCustomerSearch(workOrder ? workOrder.customerName : '');
-        // For mobile-first accordion: Open all sections if editing, otherwise just the first.
-        setOpenSections(workOrder ? ['customerInfo', 'issueDetails', 'serviceDetails', 'quotationItems', 'partsUsed'] : ['customerInfo']);
+        setOilChangeWarning(null);
+        setActiveSection('customer'); // Reset accordion
+        // Reset payment state
+        setIsPaid(workOrder?.paymentStatus === 'paid');
+        setPaymentMethod(workOrder?.paymentMethod || 'cash');
     }, [workOrder, currentBranchId, isOpen]);
     
-    // Auto-open next sections as user fills out the form for a new work order (for mobile accordion)
-    useEffect(() => {
-        if (workOrder || window.innerWidth >= 1024) { // Disable on desktop or when editing
-            return;
-        }
-
-        const sectionsToOpen = new Set(openSections);
-        let hasChanged = false;
-
-        if (sectionsToOpen.has('customerInfo') && formData.customerName && formData.vehicleModel && !sectionsToOpen.has('issueDetails')) {
-            sectionsToOpen.add('issueDetails'); hasChanged = true;
-        }
-        if (sectionsToOpen.has('issueDetails') && formData.issueDescription && !sectionsToOpen.has('serviceDetails')) {
-            sectionsToOpen.add('serviceDetails'); hasChanged = true;
-        }
-        if (sectionsToOpen.has('serviceDetails') && formData.technicianName && !sectionsToOpen.has('partsUsed')) {
-            sectionsToOpen.add('partsUsed'); sectionsToOpen.add('quotationItems'); hasChanged = true;
-        }
-        if (hasChanged) setOpenSections(Array.from(sectionsToOpen));
-    }, [formData, workOrder, openSections]);
-
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (customerInputRef.current && !customerInputRef.current.contains(event.target as Node)) {
                 setIsCustomerListOpen(false);
             }
+            if (partInputRef.current && !partInputRef.current.contains(event.target as Node)) {
+                setIsPartListOpen(false);
+            }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    // Oil Change Warning Logic
+    useEffect(() => {
+        setOilChangeWarning(null);
+        if (!formData.customerPhone) return;
+
+        const customerWorkOrders = workOrders
+            .filter(wo => wo.customerPhone === formData.customerPhone && wo.id !== workOrder?.id && wo.status === 'Trả máy')
+            .sort((a, b) => new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime());
+
+        const lastCompletedWorkOrder = customerWorkOrders[0];
+        if (!lastCompletedWorkOrder) return;
+        
+        const lastServiceDate = new Date(lastCompletedWorkOrder.creationDate);
+        const daysSinceLastService = (new Date().getTime() - lastServiceDate.getTime()) / (1000 * 3600 * 24);
+        if (daysSinceLastService > 30) {
+            setOilChangeWarning(`Đã ${Math.floor(daysSinceLastService)} ngày kể từ lần bảo dưỡng cuối. Gợi ý khách thay nhớt.`);
+            return;
+        }
+        
+        const lastMileage = lastCompletedWorkOrder.mileage;
+        const currentMileage = formData.mileage;
+        if (currentMileage && lastMileage && currentMileage > lastMileage) {
+            const kmSinceLastService = currentMileage - lastMileage;
+            if (kmSinceLastService >= 1000) {
+                 setOilChangeWarning(`Đã đi ${kmSinceLastService.toLocaleString('vi-VN')}km từ lần bảo dưỡng cuối. Gợi ý khách thay nhớt.`);
+            }
+        }
+    }, [formData.customerPhone, formData.mileage, workOrders, workOrder]);
+
+    const technicians = useMemo(() => {
+        const techDept = departments.find(d => d.name === 'Kỹ thuật viên');
+        if (!techDept) return users.filter(u => u.status === 'active');
+        return users.filter(u => u.departmentIds.includes(techDept.id) && u.status === 'active');
+    }, [users, departments]);
 
     const filteredCustomers = useMemo(() => {
         if (!customerSearch) return [];
@@ -208,8 +255,7 @@ const WorkOrderModal: React.FC<{
             customerName: customer.name,
             customerPhone: customer.phone,
             vehicleModel: customer.vehicle,
-            licensePlate: customer.licensePlate,
-            odometerReading: customer.lastServiceOdometer
+            licensePlate: customer.licensePlate
         }));
         setCustomerSearch(customer.name);
         setIsCustomerListOpen(false);
@@ -223,19 +269,22 @@ const WorkOrderModal: React.FC<{
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: name === 'laborCost' || name === 'discount' || name === 'odometerReading' ? parseFloat(value) || 0 : value }));
-    };
-    
-    const handleServiceTypeChange = (serviceType: string) => {
-        setFormData(prev => {
-            const currentTypes = prev.serviceTypes || [];
-            const newTypes = currentTypes.includes(serviceType)
-                ? currentTypes.filter(st => st !== serviceType)
-                : [...currentTypes, serviceType];
-            return { ...prev, serviceTypes: newTypes };
-        });
-    };
+        const currencyFields = ['laborCost', 'discount'];
+        const numberFields = ['mileage']; // Mileage is not currency
+        
+        let processedValue: string | number;
 
+        if (currencyFields.includes(name)) {
+            processedValue = parseCurrencyInput(value);
+        } else if (numberFields.includes(name)) {
+            // Keep existing logic for non-currency numbers
+            processedValue = parseFloat(value) || 0; 
+        } else {
+            processedValue = value;
+        }
+
+        setFormData(prev => ({ ...prev, [name]: processedValue }));
+    };
 
     const handleAddPart = (part: Part) => {
         if (!part) return;
@@ -252,7 +301,7 @@ const WorkOrderModal: React.FC<{
                 partName: part.name,
                 sku: part.sku,
                 quantity: 1,
-                price: part.sellingPrice, // Charge customer the selling price
+                price: part.sellingPrice,
             };
             return { ...prev, partsUsed: [...(prev.partsUsed || []), newPart] };
         });
@@ -295,13 +344,32 @@ const WorkOrderModal: React.FC<{
     };
 
     const handleUpdateQuoteItem = (id: string, field: 'quantity' | 'unitPrice' | 'description', value: string | number) => {
+        const processedValue = field === 'unitPrice' 
+            ? parseCurrencyInput(String(value)) 
+            : (field === 'quantity' ? Number(value) : value);
+
         setFormData(prev => ({
             ...prev,
             quotationItems: (prev.quotationItems || []).map(item =>
-                item.id === id ? { ...item, [field]: value } : item
+                item.id === id ? { ...item, [field]: processedValue } : item
             ),
         }));
     };
+
+    const filteredPartsForSearch = useMemo(() => {
+        if (!partSearchTerm) return [];
+        const lowercasedTerm = partSearchTerm.toLowerCase();
+        return parts.filter(p => 
+            (p.stock[currentBranchId] || 0) > 0 &&
+            (p.name.toLowerCase().includes(lowercasedTerm) || p.sku.toLowerCase().includes(lowercasedTerm))
+        ).slice(0, 10); // Limit results for performance
+    }, [parts, partSearchTerm, currentBranchId]);
+
+    const handleSelectPart = (part: Part) => {
+        handleAddPart(part);
+        setPartSearchTerm('');
+        setIsPartListOpen(false);
+    }
 
     const totalPartsCost = useMemo(() =>
         formData.partsUsed?.reduce((sum, part) => sum + (part.price * part.quantity), 0) || 0,
@@ -317,244 +385,388 @@ const WorkOrderModal: React.FC<{
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        
+        let newTransaction: CashTransaction | undefined = undefined;
+        let finalPaymentStatus = workOrder?.paymentStatus || 'unpaid';
+        let finalPaymentMethod = workOrder?.paymentMethod;
+        let finalPaymentDate = workOrder?.paymentDate;
+        let finalCashTransactionId = workOrder?.cashTransactionId;
+
+        // Check if a new payment is being recorded
+        if (isPaid && workOrder?.paymentStatus !== 'paid' && total > 0) {
+            const paymentSource = paymentSources.find(p => p.id === paymentMethod);
+            if (!paymentSource) {
+                alert('Nguồn tiền không hợp lệ!');
+                return;
+            }
+
+            const transactionId = `CT-${Date.now()}`;
+            newTransaction = {
+                id: transactionId,
+                type: 'income',
+                date: new Date().toISOString(),
+                amount: total,
+                contact: { id: formData.customerPhone, name: formData.customerName },
+                notes: `Thanh toán cho phiếu sửa chữa #${workOrder?.id || 'MỚI'}`,
+                paymentSourceId: paymentMethod,
+                branchId: currentBranchId,
+                workOrderId: workOrder?.id || `S${String(Math.floor(Math.random() * 900) + 100)}` // Use existing or temp ID
+            };
+
+            finalPaymentStatus = 'paid';
+            finalPaymentMethod = paymentMethod;
+            finalPaymentDate = new Date().toISOString().split('T')[0];
+            finalCashTransactionId = transactionId;
+        }
+        
         const finalWorkOrder: WorkOrder = {
             id: workOrder?.id || `S${String(Math.floor(Math.random() * 900) + 100)}`,
             creationDate: workOrder?.creationDate || new Date().toISOString().split('T')[0],
             ...formData,
             branchId: formData.branchId || currentBranchId,
             total,
+            paymentStatus: finalPaymentStatus,
+            paymentMethod: finalPaymentMethod,
+            paymentDate: finalPaymentDate,
+            cashTransactionId: finalCashTransactionId,
         };
-        onSave(finalWorkOrder);
+
+        // If it's a new work order, ensure its ID matches the one in the transaction
+        if (!workOrder) {
+            if (newTransaction) newTransaction.workOrderId = finalWorkOrder.id;
+        }
+
+        onSave(finalWorkOrder, newTransaction);
     };
 
     if (!isOpen) return null;
 
-    const renderFormContent = () => (
-        <>
-            {/* --- CUSTOMER INFO --- */}
-            <div className="space-y-4">
-                <h3 className="font-semibold text-lg text-slate-700 dark:text-slate-200 lg:hidden">Thông tin Khách hàng & Xe</h3>
-                 <div ref={customerInputRef}>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Khách hàng <span className="text-red-500">*</span></label>
-                    <div className="relative mt-1">
-                        <div className="flex">
-                            <input
-                                type="text"
-                                placeholder="Tìm hoặc thêm khách hàng..."
-                                value={customerSearch}
-                                onChange={e => {
-                                    setCustomerSearch(e.target.value);
-                                    setIsCustomerListOpen(true);
-                                    setFormData(prev => ({ ...prev, customerName: e.target.value, customerPhone: '', vehicleModel: '', licensePlate: '' }));
-                                }}
-                                onFocus={() => setIsCustomerListOpen(true)}
-                                className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-l-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:bg-slate-800 dark:text-slate-100"
-                                required
-                            />
-                            <button type="button" onClick={() => setIsNewCustomerModalOpen(true)} className="p-2 border-t border-b border-r border-slate-300 dark:border-slate-600 rounded-r-md h-[42px] bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600" title="Thêm khách hàng mới">
-                                <PlusIcon />
-                            </button>
-                        </div>
-                        {isCustomerListOpen && (
-                            <div className="absolute z-20 w-full bg-white dark:bg-slate-800 border dark:border-slate-600 rounded-md mt-1 shadow-lg max-h-60 overflow-y-auto">
-                                {filteredCustomers.length > 0 ? filteredCustomers.map(c => (
-                                    <div key={c.id} onClick={() => handleSelectCustomer(c)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer text-sm">
-                                        <p className="font-semibold dark:text-slate-200">{c.name}</p>
-                                        <p className="text-slate-500 dark:text-slate-400">{c.phone}</p>
-                                    </div>
-                                )) : (
-                                    <div className="p-2 text-sm text-slate-500 dark:text-slate-400">Không tìm thấy khách hàng.</div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
-                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                        <label htmlFor="wo-vehicleModel" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Dòng xe</label>
-                        <input id="wo-vehicleModel" type="text" name="vehicleModel" value={formData.vehicleModel} onChange={handleChange} placeholder="Honda Air Blade" className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" required />
-                    </div>
-                    <div>
-                        <label htmlFor="wo-licensePlate" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Biển số xe</label>
-                        <input id="wo-licensePlate" type="text" name="licensePlate" value={formData.licensePlate} onChange={handleChange} placeholder="59-A1 123.45" className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
-                    </div>
-                    <div>
-                        <label htmlFor="wo-odometerReading" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Số ODO (km)</label>
-                        <input id="wo-odometerReading" type="number" name="odometerReading" value={formData.odometerReading || ''} onChange={handleChange} placeholder="15000" className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
-                    </div>
-                 </div>
-            </div>
-
-            {/* --- ISSUE & SERVICE --- */}
-             <div className="space-y-4">
-                <h3 className="font-semibold text-lg text-slate-700 dark:text-slate-200 lg:hidden">Sự cố & Dịch vụ</h3>
-                <div>
-                    <label htmlFor="wo-issueDescription" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Mô tả sự cố</label>
-                    <textarea id="wo-issueDescription" name="issueDescription" value={formData.issueDescription} onChange={handleChange} placeholder="Bảo dưỡng định kỳ, thay nhớt..." rows={3} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" required />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Loại hình dịch vụ</label>
-                    <div className="flex flex-wrap gap-x-4 gap-y-2">
-                        {serviceTypesOptions.map(type => (
-                            <label key={type} className="flex items-center space-x-2 cursor-pointer text-slate-700 dark:text-slate-200">
-                                <input 
-                                    type="checkbox" 
-                                    checked={formData.serviceTypes?.includes(type) || false}
-                                    onChange={() => handleServiceTypeChange(type)}
-                                    className="rounded text-sky-600 focus:ring-sky-500"
-                                />
-                                <span>{type}</span>
-                            </label>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* --- TECHNICAL DETAILS --- */}
-            <div className="space-y-4">
-                <h3 className="font-semibold text-lg text-slate-700 dark:text-slate-200 lg:hidden">Chi tiết Kỹ thuật</h3>
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label htmlFor="wo-status" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Trạng thái</label>
-                        <select
-                            id="wo-status"
-                            name="status"
-                            value={formData.status}
-                            onChange={handleChange}
-                            className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 font-semibold transition-colors ${getStatusColorClass(formData.status)} dark:bg-transparent`}
-                        >
-                            <option value="Tiếp nhận">Tiếp nhận</option>
-                            <option value="Đang sửa">Đang sửa</option>
-                            <option value="Đã sửa xong">Đã sửa xong</option>
-                            <option value="Trả máy">Trả máy</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label htmlFor="wo-technicianName" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Kỹ thuật viên</label>
-                        <input id="wo-technicianName" type="text" name="technicianName" value={formData.technicianName} onChange={handleChange} placeholder="Trần Văn An" className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
-                    </div>
-                </div>
-                <div>
-                    <label htmlFor="wo-laborCost" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Phí dịch vụ (công thợ)</label>
-                    <input id="wo-laborCost" type="number" name="laborCost" value={formData.laborCost || ''} onChange={handleChange} placeholder="100000" className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
-                </div>
-                <div>
-                    <label htmlFor="wo-notes" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Ghi chú nội bộ</label>
-                    <textarea id="wo-notes" name="notes" value={formData.notes || ''} onChange={handleChange} placeholder="VD: Khách yêu cầu kiểm tra thêm hệ thống điện" rows={2} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
-                </div>
-           </div>
-        </>
-    );
-
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center md:items-start md:p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center md:items-start md:p-4">
             <NewCustomerModal 
                 isOpen={isNewCustomerModalOpen}
                 onClose={() => setIsNewCustomerModalOpen(false)}
                 onSave={handleSaveNewCustomer}
                 initialName={customerSearch}
             />
-             <div className="bg-white dark:bg-slate-900 w-full h-full md:h-auto md:max-w-6xl md:my-8 md:rounded-lg flex flex-col shadow-xl">
+             <div className="bg-white dark:bg-slate-900 w-full h-full md:h-auto md:max-h-[90vh] md:w-full md:max-w-6xl md:my-8 md:rounded-lg flex flex-col shadow-xl">
                 <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
                     <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100">{workOrder ? `Xử lý Phiếu #${workOrder.id}` : 'Tạo Phiếu Sửa chữa mới'}</h2>
                 </div>
                 <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
                     <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-                        {/* --- MOBILE ACCORDION LAYOUT --- */}
-                        <div className="space-y-4 lg:hidden">
-                           <AccordionSection title="Thông tin Khách hàng & Xe" id="customerInfo">{renderFormContent()}</AccordionSection>
-                           <AccordionSection title="Sự cố & Dịch vụ" id="issueDetails">{/* Content is inside renderFormContent */}</AccordionSection>
-                           <AccordionSection title="Chi tiết Kỹ thuật" id="serviceDetails">{/* Content is inside renderFormContent */}</AccordionSection>
-                           <AccordionSection title="Báo giá (Gia công, Đặt hàng)" id="quotationItems">{/* Separate content */}</AccordionSection>
-                           <AccordionSection title="Phụ tùng sử dụng" id="partsUsed">{/* Separate content */}</AccordionSection>
-                        </div>
-                        
-                        {/* --- DESKTOP TWO-COLUMN LAYOUT --- */}
-                        <div className="hidden lg:flex lg:gap-6">
-                            {/* Left Column */}
-                            <div className="lg:w-1/2 space-y-6">
-                               <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-4">
-                                    <h3 className="font-semibold text-lg text-slate-700 dark:text-slate-200">Thông tin Khách hàng & Xe</h3>
-                                    {renderFormContent().props.children[0]}
-                               </div>
-                               <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-4">
-                                    <h3 className="font-semibold text-lg text-slate-700 dark:text-slate-200">Sự cố & Dịch vụ</h3>
-                                    {renderFormContent().props.children[1]}
-                               </div>
-                               <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-4">
-                                    <h3 className="font-semibold text-lg text-slate-700 dark:text-slate-200">Chi tiết Kỹ thuật</h3>
-                                    {renderFormContent().props.children[2]}
-                               </div>
-                            </div>
-                            {/* Right Column */}
-                            <div className="lg:w-1/2 space-y-6">
-                                <div className="border border-slate-200 dark:border-slate-700 rounded-lg">
-                                    <h3 className="font-semibold text-lg text-slate-700 dark:text-slate-200 p-4">Phụ tùng sử dụng</h3>
-                                    <div className="p-4 border-t border-slate-200 dark:border-slate-700">
-                                        <div className="flex justify-between items-center gap-4 mb-4">
-                                            <h4 className="font-medium text-slate-700 dark:text-slate-200">Thêm phụ tùng</h4>
-                                            <div className="flex-grow max-w-xs sm:max-w-sm">
-                                                <select onChange={(e) => { handleAddPart(parts.find(p => p.id === e.target.value) as Part); e.target.value = ""; }} defaultValue="" className="p-2 border border-slate-300 dark:border-slate-600 rounded w-full text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800">
-                                                    <option value="" disabled>-- Chọn phụ tùng --</option>
-                                                    {parts.filter(p => (p.stock[currentBranchId] || 0) > 0).map(p => <option key={p.id} value={p.id}>{p.name} (Tồn: {p.stock[currentBranchId]})</option>)}
-                                                </select>
-                                            </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-x-8 gap-y-0 lg:gap-y-6">
+                            
+                            {/* LEFT COLUMN */}
+                            <div className="lg:col-span-2 space-y-6">
+                                <SectionWrapper title="Thông tin Khách hàng & Sự cố" id="customer" activeId={activeSection} setActiveId={setActiveSection}>
+                                    {oilChangeWarning && (
+                                        <div className="p-3 mb-2 bg-amber-100 dark:bg-amber-900/50 border-l-4 border-amber-500 text-amber-800 dark:text-amber-200 flex items-start space-x-3 rounded-r-lg">
+                                            <ExclamationTriangleIcon className="w-6 h-6 flex-shrink-0 text-amber-500 mt-0.5" />
+                                            <p className="text-sm font-medium">{oilChangeWarning}</p>
                                         </div>
-                                         <div className="max-h-48 overflow-y-auto">
-                                            <table className="w-full text-left text-sm">
-                                                <thead className="bg-slate-100 dark:bg-slate-800 sticky top-0"><tr><th className="p-2 font-semibold">Tên</th><th className="p-2 font-semibold">SL</th><th className="p-2 font-semibold">Đ.Giá</th><th className="p-2 font-semibold">T.Tiền</th><th></th></tr></thead>
-                                                <tbody>
-                                                    {formData.partsUsed?.map(p => (
-                                                        <tr key={p.partId} className="border-b dark:border-slate-700">
-                                                            <td className="p-2 font-medium dark:text-slate-200">{p.partName}</td>
-                                                            <td className="p-1"><input type="number" value={p.quantity} onChange={(e) => handlePartQuantityChange(p.partId, parseInt(e.target.value))} min="1" className="w-16 p-1 border rounded dark:bg-slate-800 dark:border-slate-600"/></td>
-                                                            <td className="p-2 dark:text-slate-300">{formatCurrency(p.price)}</td>
-                                                            <td className="p-2 dark:text-slate-100 font-semibold">{formatCurrency(p.price * p.quantity)}</td>
-                                                            <td className="p-1 text-right"><button type="button" onClick={() => handleRemovePart(p.partId)} className="text-red-500"><TrashIcon className="w-5 h-5"/></button></td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
+                                    )}
+                                    <div ref={customerInputRef}>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Khách hàng <span className="text-red-500">*</span></label>
+                                        <div className="relative mt-1">
+                                            <div className="flex">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Tìm hoặc thêm khách hàng..."
+                                                    value={customerSearch}
+                                                    onChange={e => {
+                                                        setCustomerSearch(e.target.value);
+                                                        setIsCustomerListOpen(true);
+                                                        setFormData(prev => ({ ...prev, customerName: e.target.value, customerPhone: '', vehicleModel: '', licensePlate: '' }));
+                                                    }}
+                                                    onFocus={() => setIsCustomerListOpen(true)}
+                                                    className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-l-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 dark:bg-slate-800 dark:text-slate-100"
+                                                    required
+                                                />
+                                                <button type="button" onClick={() => setIsNewCustomerModalOpen(true)} className="p-2 border-t border-b border-r border-slate-300 dark:border-slate-600 rounded-r-md h-[42px] bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600" title="Thêm khách hàng mới">
+                                                    <PlusIcon />
+                                                </button>
+                                            </div>
+                                            {isCustomerListOpen && (
+                                                <div className="absolute z-20 w-full bg-white dark:bg-slate-800 border dark:border-slate-600 rounded-md mt-1 shadow-lg max-h-60 overflow-y-auto">
+                                                    {filteredCustomers.length > 0 ? filteredCustomers.map(c => (
+                                                        <div key={c.id} onClick={() => handleSelectCustomer(c)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer text-sm">
+                                                            <p className="font-semibold dark:text-slate-200">{c.name}</p>
+                                                            <p className="text-slate-500 dark:text-slate-400">{c.phone}</p>
+                                                        </div>
+                                                    )) : (
+                                                        <div className="p-2 text-sm text-slate-500 dark:text-slate-400">Không tìm thấy khách hàng.</div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
-                                </div>
-                                <div className="border border-slate-200 dark:border-slate-700 rounded-lg">
-                                     <h3 className="font-semibold text-lg text-slate-700 dark:text-slate-200 p-4">Báo giá (Gia công, Đặt hàng)</h3>
-                                     <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label htmlFor="wo-vehicleModel" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Dòng xe</label>
+                                            <input id="wo-vehicleModel" type="text" name="vehicleModel" value={formData.vehicleModel} onChange={handleChange} placeholder="Honda Air Blade" className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" required />
+                                        </div>
+                                        <div>
+                                            <label htmlFor="wo-licensePlate" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Biển số xe</label>
+                                            <input id="wo-licensePlate" type="text" name="licensePlate" value={formData.licensePlate} onChange={handleChange} placeholder="59-A1 123.45" className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="wo-mileage" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Số KM hiện tại</label>
+                                        <input id="wo-mileage" type="number" name="mileage" value={formData.mileage || ''} onChange={handleChange} placeholder="15000" className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="wo-issueDescription" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Mô tả sự cố</label>
+                                        <textarea id="wo-issueDescription" name="issueDescription" value={formData.issueDescription} onChange={handleChange} placeholder="Bảo dưỡng định kỳ, thay nhớt..." rows={3} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" required />
+                                    </div>
+                                </SectionWrapper>
+                            </div>
+
+                             {/* RIGHT COLUMN */}
+                             <div className="lg:col-span-3 space-y-6">
+                                <SectionWrapper title="Chi tiết Dịch vụ" id="service" activeId={activeSection} setActiveId={setActiveSection}>
+                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label htmlFor="wo-status" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Trạng thái</label>
+                                            <select
+                                                id="wo-status"
+                                                name="status"
+                                                value={formData.status}
+                                                onChange={handleChange}
+                                                className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 font-semibold transition-colors ${getStatusColorClass(formData.status)} dark:bg-transparent`}
+                                            >
+                                                <option value="Tiếp nhận">Tiếp nhận</option>
+                                                <option value="Đang sửa">Đang sửa</option>
+                                                <option value="Đã sửa xong">Đã sửa xong</option>
+                                                <option value="Trả máy">Trả máy</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label htmlFor="wo-technicianName" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Kỹ thuật viên</label>
+                                            <select 
+                                                id="wo-technicianName" 
+                                                name="technicianName" 
+                                                value={formData.technicianName} 
+                                                onChange={handleChange} 
+                                                className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100"
+                                            >
+                                                <option value="">-- Chọn kỹ thuật viên --</option>
+                                                {technicians.map(tech => (
+                                                    <option key={tech.id} value={tech.name}>{tech.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="wo-laborCost" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Phí dịch vụ (công thợ)</label>
+                                        <input id="wo-laborCost" type="text" name="laborCost" value={formatCurrencyInput(formData.laborCost || '')} onChange={handleChange} placeholder="100.000" className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100 text-right" />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="wo-notes" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Ghi chú nội bộ</label>
+                                        <textarea id="wo-notes" name="notes" value={formData.notes || ''} onChange={handleChange} placeholder="VD: Khách yêu cầu kiểm tra thêm hệ thống điện" rows={2} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
+                                    </div>
+                                </SectionWrapper>
+                                <SectionWrapper title="Phụ tùng sử dụng" id="parts" activeId={activeSection} setActiveId={setActiveSection}>
+                                    <div className="relative" ref={partInputRef}>
+                                        <input
+                                            type="text"
+                                            placeholder="Tìm kiếm phụ tùng theo tên hoặc SKU..."
+                                            value={partSearchTerm}
+                                            onChange={e => {
+                                                setPartSearchTerm(e.target.value);
+                                                setIsPartListOpen(true);
+                                            }}
+                                            onFocus={() => setIsPartListOpen(true)}
+                                            className="p-2 border border-slate-300 dark:border-slate-600 rounded w-full text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800"
+                                        />
+                                        {isPartListOpen && partSearchTerm && (
+                                            <div className="absolute z-20 w-full bg-white dark:bg-slate-800 border dark:border-slate-600 rounded-md mt-1 shadow-lg max-h-60 overflow-y-auto">
+                                                {filteredPartsForSearch.length > 0 ? filteredPartsForSearch.map(p => (
+                                                    <div key={p.id} onClick={() => handleSelectPart(p)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer text-sm">
+                                                        <p className="font-semibold dark:text-slate-200">{p.name}</p>
+                                                        <p className="text-slate-500 dark:text-slate-400">Tồn: {p.stock[currentBranchId] || 0} - {formatCurrency(p.sellingPrice)}</p>
+                                                    </div>
+                                                )) : (
+                                                    <div className="p-2 text-sm text-slate-500 dark:text-slate-400">Không tìm thấy phụ tùng.</div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="md:hidden space-y-3">
+                                        {formData.partsUsed?.map(p => (
+                                            <div key={p.partId} className="p-3 border border-slate-200 dark:border-slate-600 rounded-lg space-y-2">
+                                                <div className="flex justify-between items-start">
+                                                    <p className="font-medium text-slate-800 dark:text-slate-100">{p.partName}</p>
+                                                    <button type="button" onClick={() => handleRemovePart(p.partId)} className="text-red-500 hover:text-red-700 ml-2"><TrashIcon className="w-5 h-5"/></button>
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="text-sm text-slate-500 dark:text-slate-400">SL:</label>
+                                                        <input type="number" value={p.quantity} onChange={(e) => handlePartQuantityChange(p.partId, parseInt(e.target.value))} min="1" className="w-16 p-1 border rounded dark:bg-slate-800 dark:border-slate-600"/>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-sm text-slate-500 dark:text-slate-400">{formatCurrency(p.price)}</p>
+                                                        <p className="font-semibold dark:text-slate-100">{formatCurrency(p.price * p.quantity)}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="hidden md:block max-h-48 overflow-y-auto">
                                         <table className="w-full text-left text-sm">
-                                            <thead className="bg-slate-100 dark:bg-slate-800"><tr><th className="p-2 font-semibold w-2/5">Mô tả</th><th className="p-2 font-semibold">SL</th><th className="p-2 font-semibold">Đ.Giá</th><th className="p-2 font-semibold">T.Tiền</th><th></th></tr></thead>
+                                            <thead className="bg-slate-100 dark:bg-slate-800 sticky top-0"><tr><th className="p-2 font-semibold">Tên</th><th className="p-2 font-semibold">SL</th><th className="p-2 font-semibold">Đ.Giá</th><th className="p-2 font-semibold">T.Tiền</th><th></th></tr></thead>
+                                            <tbody>
+                                                {formData.partsUsed?.map(p => (
+                                                    <tr key={p.partId} className="border-b dark:border-slate-700">
+                                                        <td className="p-2 font-medium dark:text-slate-200">{p.partName}</td>
+                                                        <td className="p-1"><input type="number" value={p.quantity} onChange={(e) => handlePartQuantityChange(p.partId, parseInt(e.target.value))} min="1" className="w-16 p-1 border rounded dark:bg-slate-800 dark:border-slate-600"/></td>
+                                                        <td className="p-2 dark:text-slate-300">{formatCurrency(p.price)}</td>
+                                                        <td className="p-2 dark:text-slate-100 font-semibold">{formatCurrency(p.price * p.quantity)}</td>
+                                                        <td className="p-1 text-right"><button type="button" onClick={() => handleRemovePart(p.partId)} className="text-red-500"><TrashIcon className="w-5 h-5"/></button></td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </SectionWrapper>
+                            </div>
+
+                            {/* FULL WIDTH SECTION for QUOTES */}
+                            <div className="lg:col-span-5">
+                                <SectionWrapper title="Báo giá (Gia công, Đặt hàng)" id="quote" activeId={activeSection} setActiveId={setActiveSection}>
+                                   <div className="md:hidden space-y-3">
+                                        {formData.quotationItems?.map(item => (
+                                            <div key={item.id} className="p-3 border border-slate-200 dark:border-slate-600 rounded-lg space-y-2">
+                                                <div className="flex justify-between items-start">
+                                                    <input type="text" value={item.description} onChange={e => handleUpdateQuoteItem(item.id, 'description', e.target.value)} className="w-full p-1 bg-transparent dark:text-slate-100 font-medium"/>
+                                                    <button type="button" onClick={() => handleRemoveQuoteItem(item.id)} className="text-red-500 hover:text-red-700 ml-2"><TrashIcon className="w-5 h-5"/></button>
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="text-sm text-slate-500 dark:text-slate-400">SL:</label>
+                                                        <input type="number" value={item.quantity} onChange={e => handleUpdateQuoteItem(item.id, 'quantity', Number(e.target.value))} min="1" className="w-16 p-1 border border-slate-300 dark:border-slate-600 rounded text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800"/>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="text-sm text-slate-500 dark:text-slate-400">Đ.Giá:</label>
+                                                        <input type="text" value={formatCurrencyInput(item.unitPrice)} onChange={e => handleUpdateQuoteItem(item.id, 'unitPrice', e.target.value)} className="w-24 p-1 border border-slate-300 dark:border-slate-600 rounded text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 text-right"/>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right font-semibold border-t border-slate-200 dark:border-slate-600 pt-2 mt-2 dark:text-slate-100">{formatCurrency(item.unitPrice * item.quantity)}</div>
+                                            </div>
+                                        ))}
+                                        <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg space-y-2 border-dashed border-2 dark:border-slate-600">
+                                            <input type="text" placeholder="Mô tả công việc/phụ tùng..." value={newQuoteItem.description} onChange={e => setNewQuoteItem(prev => ({...prev, description: e.target.value}))} className="w-full p-2 border rounded bg-white dark:bg-slate-700 dark:border-slate-600 text-slate-900 dark:text-slate-100"/>
+                                            <div className="flex gap-4">
+                                                <input type="number" placeholder="SL" value={newQuoteItem.quantity} onChange={e => setNewQuoteItem(prev => ({...prev, quantity: Number(e.target.value)}))} min="1" className="w-1/2 p-2 border rounded bg-white dark:bg-slate-700 dark:border-slate-600 text-slate-900 dark:text-slate-100"/>
+                                                <input type="text" placeholder="Đơn giá" value={formatCurrencyInput(newQuoteItem.unitPrice)} onChange={e => setNewQuoteItem(prev => ({...prev, unitPrice: parseCurrencyInput(e.target.value)}))} className="w-1/2 p-2 border rounded bg-white dark:bg-slate-700 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-right"/>
+                                            </div>
+                                            <button type="button" onClick={handleAddQuoteItem} className="w-full bg-sky-600 text-white rounded px-3 py-2 text-sm font-semibold hover:bg-sky-700">Thêm vào báo giá</button>
+                                        </div>
+                                   </div>
+                                    <div className="hidden md:block">
+                                        <table className="w-full text-left text-sm">
+                                            <thead className="bg-slate-100 dark:bg-slate-800">
+                                                <tr>
+                                                    <th className="p-2 font-semibold text-slate-700 dark:text-slate-300 w-2/5">Mô tả</th><th className="p-2 font-semibold text-slate-700 dark:text-slate-300">SL</th><th className="p-2 font-semibold text-slate-700 dark:text-slate-300">Đơn giá</th><th className="p-2 font-semibold text-slate-700 dark:text-slate-300">Thành tiền</th><th className="p-2"></th>
+                                                </tr>
+                                            </thead>
                                             <tbody>
                                                 {formData.quotationItems?.map(item => (
-                                                    <tr key={item.id} className="border-b dark:border-slate-700"><td className="p-1"><input type="text" value={item.description} onChange={e => handleUpdateQuoteItem(item.id, 'description', e.target.value)} className="w-full p-1 bg-transparent dark:text-slate-100"/></td><td className="p-1"><input type="number" value={item.quantity} onChange={e => handleUpdateQuoteItem(item.id, 'quantity', Number(e.target.value))} min="1" className="w-16 p-1 border rounded dark:bg-slate-800 dark:border-slate-600"/></td><td className="p-1"><input type="number" value={item.unitPrice} onChange={e => handleUpdateQuoteItem(item.id, 'unitPrice', Number(e.target.value))} min="0" className="w-24 p-1 border rounded dark:bg-slate-800 dark:border-slate-600"/></td><td className="p-2 dark:text-slate-100 font-semibold">{formatCurrency(item.unitPrice * item.quantity)}</td><td className="p-1 text-right"><button type="button" onClick={() => handleRemoveQuoteItem(item.id)} className="text-red-500"><TrashIcon className="w-5 h-5"/></button></td></tr>
+                                                    <tr key={item.id} className="border-b border-slate-200 dark:border-slate-700">
+                                                        <td className="p-1"><input type="text" value={item.description} onChange={e => handleUpdateQuoteItem(item.id, 'description', e.target.value)} className="w-full p-1 bg-transparent dark:text-slate-100"/></td>
+                                                        <td className="p-1"><input type="number" value={item.quantity} onChange={e => handleUpdateQuoteItem(item.id, 'quantity', Number(e.target.value))} min="1" className="w-16 p-1 border rounded dark:bg-slate-800 dark:border-slate-600"/></td>
+                                                        <td className="p-1"><input type="text" value={formatCurrencyInput(item.unitPrice)} onChange={e => handleUpdateQuoteItem(item.id, 'unitPrice', e.target.value)} className="w-24 p-1 border rounded dark:bg-slate-800 dark:border-slate-600 text-right"/></td>
+                                                        <td className="p-2 dark:text-slate-100 font-semibold">{formatCurrency(item.unitPrice * item.quantity)}</td>
+                                                        <td className="p-1 text-right"><button type="button" onClick={() => handleRemoveQuoteItem(item.id)} className="text-red-500"><TrashIcon className="w-5 h-5"/></button></td>
+                                                    </tr>
                                                 ))}
                                             </tbody>
                                             <tfoot>
-                                                <tr className="bg-slate-50 dark:bg-slate-800/50"><td className="p-1"><input type="text" placeholder="Mô tả..." value={newQuoteItem.description} onChange={e => setNewQuoteItem(prev => ({...prev, description: e.target.value}))} className="w-full p-1 border rounded bg-white dark:bg-slate-700 dark:border-slate-600"/></td><td className="p-1"><input type="number" value={newQuoteItem.quantity} onChange={e => setNewQuoteItem(prev => ({...prev, quantity: Number(e.target.value)}))} min="1" className="w-16 p-1 border rounded bg-white dark:bg-slate-700 dark:border-slate-600"/></td><td className="p-1"><input type="number" placeholder="Đơn giá" value={newQuoteItem.unitPrice || ''} onChange={e => setNewQuoteItem(prev => ({...prev, unitPrice: Number(e.target.value)}))} min="0" className="w-24 p-1 border rounded bg-white dark:bg-slate-700 dark:border-slate-600"/></td><td></td><td className="p-1 text-right"><button type="button" onClick={handleAddQuoteItem} className="bg-sky-600 text-white rounded px-3 py-1 text-sm font-semibold hover:bg-sky-700">Thêm</button></td></tr>
+                                                <tr className="bg-slate-50 dark:bg-slate-800/50">
+                                                    <td className="p-1"><input type="text" placeholder="Mô tả..." value={newQuoteItem.description} onChange={e => setNewQuoteItem(prev => ({...prev, description: e.target.value}))} className="w-full p-1 border rounded bg-white dark:bg-slate-700 dark:border-slate-600"/></td>
+                                                    <td className="p-1"><input type="number" value={newQuoteItem.quantity} onChange={e => setNewQuoteItem(prev => ({...prev, quantity: Number(e.target.value)}))} min="1" className="w-16 p-1 border rounded bg-white dark:bg-slate-700 dark:border-slate-600"/></td>
+                                                    <td className="p-1"><input type="text" placeholder="Đơn giá" value={formatCurrencyInput(newQuoteItem.unitPrice)} onChange={e => setNewQuoteItem(prev => ({...prev, unitPrice: parseCurrencyInput(e.target.value)}))} className="w-24 p-1 border rounded bg-white dark:bg-slate-700 dark:border-slate-600 text-right"/></td>
+                                                    <td></td>
+                                                    <td className="p-1 text-right"><button type="button" onClick={handleAddQuoteItem} className="bg-sky-600 text-white rounded px-3 py-1 text-sm font-semibold hover:bg-sky-700">Thêm</button></td>
+                                                </tr>
                                             </tfoot>
                                         </table>
-                                     </div>
-                                </div>
+                                    </div>
+                                </SectionWrapper>
                             </div>
-                        </div>
 
+                        </div>
                     </div>
                     {/* Sticky Footer with Totals and Actions */}
                     <div className="bg-slate-50 dark:bg-slate-800/70 backdrop-blur-sm p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 flex-shrink-0">
-                        <div className="max-w-md ml-auto space-y-2 mb-4">
-                            <div className="flex justify-between text-sm"><span className="text-slate-700 dark:text-slate-300">Phí dịch vụ:</span> <span className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(formData.laborCost || 0)}</span></div>
-                            <div className="flex justify-between text-sm"><span className="text-slate-700 dark:text-slate-300">Tiền phụ tùng:</span> <span className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(totalPartsCost)}</span></div>
-                            <div className="flex justify-between text-sm"><span className="text-slate-700 dark:text-slate-300">Gia công/Đặt hàng:</span> <span className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(totalQuoteCost)}</span></div>
-                             <div className="flex justify-between items-center py-1">
-                                <label htmlFor="wo-discount" className="text-red-600 dark:text-red-400 font-bold text-base">Giảm giá:</label>
-                                <input id="wo-discount" type="number" name="discount" value={formData.discount || ''} onChange={handleChange} placeholder="0" className="w-32 px-2 py-1 bg-white dark:bg-slate-700 border-2 border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 text-red-600 dark:text-red-400 font-bold text-base text-right"/>
+                        <div className="max-w-md ml-auto">
+                            <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-700 dark:text-slate-300">Phí dịch vụ:</span> 
+                                    <span className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(formData.laborCost || 0)}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-700 dark:text-slate-300">Tiền phụ tùng:</span> 
+                                    <span className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(totalPartsCost)}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-700 dark:text-slate-300">Gia công/Đặt hàng:</span> 
+                                    <span className="font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(totalQuoteCost)}</span>
+                                </div>
+                                <div className="flex justify-between items-center py-1">
+                                    <label htmlFor="wo-discount" className="text-red-600 dark:text-red-400 font-bold text-base">Giảm giá:</label>
+                                    <input 
+                                        id="wo-discount" 
+                                        type="text" 
+                                        name="discount" 
+                                        value={formatCurrencyInput(formData.discount || '')} 
+                                        onChange={handleChange} 
+                                        placeholder="0" 
+                                        className="w-36 px-2 py-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-red-600 dark:text-red-400 font-bold text-base text-right"
+                                    />
+                                </div>
                             </div>
-                            <div className="flex justify-between text-xl font-bold pt-2 border-t border-slate-300 dark:border-slate-600"><span className="text-slate-900 dark:text-slate-100">Tổng cộng:</span> <span className="text-sky-600 dark:text-sky-400">{formatCurrency(total)}</span></div>
+                            <div className="border-t border-slate-300 dark:border-slate-600 mt-3 pt-3">
+                                <div className="flex justify-between text-xl font-bold">
+                                    <span className="text-slate-900 dark:text-slate-100">Tổng cộng:</span> 
+                                    <span className="text-sky-600 dark:text-sky-400">{formatCurrency(total)}</span>
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex justify-end space-x-3">
-                            <button type="button" onClick={onClose} className="flex items-center gap-2 bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">
-                                <ArrowUturnLeftIcon className="w-5 h-5" />
-                                Trở về
-                            </button>
+                        {formData.status === 'Trả máy' && (
+                            <div className="border-t border-slate-300 dark:border-slate-600 mt-4 pt-4">
+                                <h4 className="font-semibold text-slate-800 dark:text-slate-100 mb-2">Thanh toán</h4>
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:gap-6">
+                                    <div className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            id="is-paid-checkbox"
+                                            checked={isPaid}
+                                            onChange={e => setIsPaid(e.target.checked)}
+                                            disabled={workOrder?.paymentStatus === 'paid'}
+                                            className="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+                                        />
+                                        <label htmlFor="is-paid-checkbox" className="ml-2 font-medium text-slate-700 dark:text-slate-300">
+                                            {workOrder?.paymentStatus === 'paid' ? 'Đã thanh toán' : 'Đánh dấu đã thanh toán'}
+                                        </label>
+                                    </div>
+                                    {isPaid && (
+                                        <div className="flex items-center gap-4 mt-2 sm:mt-0">
+                                            <label className="flex items-center text-slate-700 dark:text-slate-300">
+                                                <input type="radio" name="paymentMethod" value="cash" checked={paymentMethod === 'cash'} onChange={() => setPaymentMethod('cash')} disabled={workOrder?.paymentStatus === 'paid'} className="mr-1"/>
+                                                Tiền mặt
+                                            </label>
+                                             <label className="flex items-center text-slate-700 dark:text-slate-300">
+                                                <input type="radio" name="paymentMethod" value="bank" checked={paymentMethod === 'bank'} onChange={() => setPaymentMethod('bank')} disabled={workOrder?.paymentStatus === 'paid'} className="mr-1"/>
+                                                Chuyển khoản
+                                            </label>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                        <div className="flex justify-end space-x-3 mt-4">
+                            <button type="button" onClick={onClose} className="bg-slate-200 text-slate-800 dark:bg-slate-600 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500">Hủy</button>
                             <button type="submit" className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700">Lưu Phiếu</button>
                         </div>
                     </div>
@@ -629,7 +841,6 @@ const PrintInvoiceModal: React.FC<{
                             <p><span className="font-semibold text-slate-800 dark:text-slate-200">Khách hàng:</span> {workOrder.customerName}</p>
                             <p><span className="font-semibold text-slate-800 dark:text-slate-200">Điện thoại:</span> {workOrder.customerPhone}</p>
                             <p><span className="font-semibold text-slate-800 dark:text-slate-200">Xe:</span> {workOrder.vehicleModel} ({workOrder.licensePlate})</p>
-                             {workOrder.odometerReading && <p><span className="font-semibold text-slate-800 dark:text-slate-200">Số km:</span> {workOrder.odometerReading.toLocaleString('vi-VN')} km</p>}
                         </div>
                     </div>
                      <p className="mt-4 dark:text-slate-300"><span className="font-semibold text-slate-800 dark:text-slate-200">Yêu cầu của khách:</span> {workOrder.issueDescription}</p>
@@ -735,11 +946,17 @@ interface ServiceManagerProps {
     currentBranchId: string;
     customers: Customer[];
     setCustomers: React.Dispatch<React.SetStateAction<Customer[]>>;
+    users: User[];
+    departments: Department[];
+    paymentSources: PaymentSource[];
+    setPaymentSources: React.Dispatch<React.SetStateAction<PaymentSource[]>>;
+    cashTransactions: CashTransaction[];
+    setCashTransactions: React.Dispatch<React.SetStateAction<CashTransaction[]>>;
 }
 
 const ITEMS_PER_PAGE = 15;
 
-const ServiceManager: React.FC<ServiceManagerProps> = ({ currentUser, workOrders, setWorkOrders, parts, storeSettings, currentBranchId, customers, setCustomers }) => {
+const ServiceManager: React.FC<ServiceManagerProps> = ({ currentUser, workOrders, setWorkOrders, parts, storeSettings, currentBranchId, customers, setCustomers, users, departments, paymentSources, setPaymentSources, cashTransactions, setCashTransactions }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
     const [statusFilter, setStatusFilter] = useState('all');
@@ -772,32 +989,26 @@ const ServiceManager: React.FC<ServiceManagerProps> = ({ currentUser, workOrders
         setInvoiceWorkOrder(null);
     };
 
-    const handleSaveWorkOrder = (workOrder: WorkOrder) => {
-        // Update work orders list
+    const handleSaveWorkOrder = (workOrder: WorkOrder, newTransaction?: CashTransaction) => {
         if (selectedWorkOrder) {
             setWorkOrders(prev => prev.map(wo => wo.id === workOrder.id ? workOrder : wo));
         } else {
             setWorkOrders(prev => [workOrder, ...prev]);
         }
-    
-        // Update customer last service info if it's an oil change
-        if (workOrder.status === 'Trả máy' && workOrder.serviceTypes?.includes('Thay nhớt') && workOrder.odometerReading) {
-            setCustomers(prevCustomers => prevCustomers.map(c => {
-                if (c.phone === workOrder.customerPhone) {
-                    // Only update if this service is newer
-                    const isNewerService = !c.lastServiceDate || new Date(workOrder.creationDate) >= new Date(c.lastServiceDate);
-                    if (isNewerService) {
-                        return {
-                            ...c,
-                            lastServiceOdometer: workOrder.odometerReading,
-                            lastServiceDate: workOrder.creationDate,
-                        };
-                    }
+        
+        if (newTransaction) {
+            setCashTransactions(prev => [newTransaction, ...prev]);
+            setPaymentSources(prevSources => prevSources.map(ps => {
+                if (ps.id === newTransaction.paymentSourceId) {
+                    const newBalance = { ...ps.balance };
+                    const change = newTransaction.amount; // Always income for services
+                    newBalance[currentBranchId] = (newBalance[currentBranchId] || 0) + change;
+                    return { ...ps, balance: newBalance };
                 }
-                return c;
+                return ps;
             }));
         }
-    
+
         handleCloseModal();
     };
 
@@ -843,6 +1054,10 @@ const ServiceManager: React.FC<ServiceManagerProps> = ({ currentUser, workOrders
                 currentBranchId={currentBranchId}
                 customers={customers}
                 setCustomers={setCustomers}
+                workOrders={workOrders}
+                users={users}
+                departments={departments}
+                paymentSources={paymentSources}
             />
             <PrintInvoiceModal
                 isOpen={isInvoiceModalOpen}

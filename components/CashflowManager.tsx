@@ -1,194 +1,219 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import type { CashTransaction, PaymentSource, Customer, Supplier, Contact, ContactType } from '../types';
-import { BuildingLibraryIcon, ArrowDownCircleIcon, ArrowUpCircleIcon, PlusIcon, XMarkIcon, Cog6ToothIcon, PencilSquareIcon } from './common/Icons';
+import type { CashTransaction, PaymentSource, Customer, Supplier, StoreSettings } from '../types';
+import { PlusIcon, ArrowUpCircleIcon, ArrowDownCircleIcon, PencilSquareIcon, TrashIcon, XMarkIcon, Cog6ToothIcon } from './common/Icons';
 import Pagination from './common/Pagination';
 
 const formatCurrency = (amount: number) => {
-    if (isNaN(amount)) return '0 ₫';
+    // FIX: Add check for NaN to prevent "NaN ₫" from being displayed
+    if (isNaN(amount)) {
+        return '0 ₫';
+    }
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 };
 
 // --- MODALS ---
-const ContactModal: React.FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    onSave: (contact: Omit<Contact, 'id'>) => void;
-}> = ({ isOpen, onClose, onSave }) => {
-    const [name, setName] = useState('');
-    const [phone, setPhone] = useState('');
-    const [type, setType] = useState<ContactType>('Khách hàng');
-    
-    useEffect(() => {
-        if (isOpen) {
-            setName('');
-            setPhone('');
-            setType('Khách hàng');
-        }
-    }, [isOpen]);
 
-    const handleSave = () => {
-        if (!name) return;
-        onSave({ name, phone, type: [type] });
-        onClose();
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-[60] flex justify-center items-center p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-lg">
-                <div className="p-4 border-b dark:border-slate-700 flex justify-between items-center">
-                    <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Thêm liên hệ</h3>
-                    <button onClick={onClose}><XMarkIcon className="w-6 h-6 text-slate-500 dark:text-slate-300" /></button>
-                </div>
-                <div className="p-6 space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Tên (*)</label>
-                        <input type="text" value={name} onChange={e => setName(e.target.value)} className="mt-1 w-full p-2 border dark:border-slate-600 rounded-md dark:bg-slate-700 dark:text-white" autoFocus />
-                    </div>
-                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Điện thoại</label>
-                        <input type="text" value={phone} onChange={e => setPhone(e.target.value)} className="mt-1 w-full p-2 border dark:border-slate-600 rounded-md dark:bg-slate-700 dark:text-white" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Phân loại</label>
-                         <div className="flex flex-wrap gap-4 mt-2 text-slate-700 dark:text-slate-300">
-                            {(['Khách hàng', 'Nhà cung cấp', 'Đối tác sửa chữa', 'Đối tác tài chính'] as ContactType[]).map(t => (
-                                <label key={t} className="flex items-center">
-                                    <input type="radio" name="contactType" value={t} checked={type === t} onChange={() => setType(t)} className="mr-2"/>
-                                    {t}
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t dark:border-slate-700 flex justify-end">
-                    <button onClick={handleSave} className="bg-orange-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-orange-600">Lưu</button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
+// Transaction Modal
 const TransactionModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
-    onSave: (transaction: Omit<CashTransaction, 'id' | 'branchId'>) => void;
-    type: 'income' | 'expense';
-    contacts: { id: string, name: string, phone?: string }[];
+    onSave: (transaction: CashTransaction) => void;
+    transaction: Partial<CashTransaction> | null;
+    contacts: { id: string; name: string }[];
     paymentSources: PaymentSource[];
-    onAddNewContact: () => void;
-    onConfigureSources: () => void;
-}> = ({ isOpen, onClose, onSave, type, contacts, paymentSources, onAddNewContact, onConfigureSources }) => {
+    currentBranchId: string;
+}> = ({ isOpen, onClose, onSave, transaction, contacts, paymentSources, currentBranchId }) => {
+    const [formData, setFormData] = useState<Partial<CashTransaction>>({});
     const [contactSearch, setContactSearch] = useState('');
-    const [selectedContact, setSelectedContact] = useState<{id: string, name: string} | null>(null);
     const [isContactListOpen, setIsContactListOpen] = useState(false);
-    const [amount, setAmount] = useState<number | ''>('');
-    const [notes, setNotes] = useState('');
-    const [useCurrentTime, setUseCurrentTime] = useState(true);
-    const [customDate, setCustomDate] = useState(new Date().toISOString().slice(0, 16));
-    const [selectedPaymentSourceId, setSelectedPaymentSourceId] = useState('');
+    const contactInputRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if(isOpen) {
-            // Reset form
-            setContactSearch('');
-            setSelectedContact(null);
-            setIsContactListOpen(false);
-            setAmount('');
-            setNotes('');
-            setUseCurrentTime(true);
-            const defaultSource = paymentSources.find(p => p.isDefault) || paymentSources[0];
-            setSelectedPaymentSourceId(defaultSource?.id || '');
+        if (isOpen) {
+            const initialData: Partial<CashTransaction> = transaction ? { ...transaction, date: new Date(transaction.date!).toISOString().substring(0, 16) } : {
+                type: 'expense',
+                date: new Date().toISOString().substring(0, 16), // For datetime-local
+                branchId: currentBranchId
+            };
+            setFormData(initialData);
+            setContactSearch(transaction?.contact?.name || '');
         }
-    }, [isOpen, paymentSources]);
+    }, [transaction, isOpen, currentBranchId]);
 
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (contactInputRef.current && !contactInputRef.current.contains(event.target as Node)) {
+                setIsContactListOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const filteredContacts = useMemo(() => {
+        if (!contactSearch) return contacts;
+        return contacts.filter(c => c.name.toLowerCase().includes(contactSearch.toLowerCase()));
+    }, [contacts, contactSearch]);
+
+    const handleSelectContact = (contact: { id: string, name: string }) => {
+        setFormData(prev => ({ ...prev, contact }));
+        setContactSearch(contact.name);
+        setIsContactListOpen(false);
+    };
+    
     const handleSave = () => {
-        if (!selectedContact || !amount || !selectedPaymentSourceId) {
-            alert("Vui lòng điền đầy đủ thông tin bắt buộc.");
+        if (!formData.amount || formData.amount <= 0 || !formData.paymentSourceId || !contactSearch.trim()) {
+            alert('Vui lòng điền đầy đủ thông tin: Số tiền, Đối tượng, và Nguồn tiền.');
             return;
         }
-        onSave({
-            type,
-            contact: selectedContact,
-            amount: Number(amount),
-            notes,
-            paymentSourceId: selectedPaymentSourceId,
-            date: useCurrentTime ? new Date().toISOString() : new Date(customDate).toISOString(),
-        });
+
+        let finalContact = formData.contact;
+        if (!finalContact) {
+            finalContact = { id: `custom-${Date.now()}`, name: contactSearch.trim() };
+        }
+
+        const finalTransaction: CashTransaction = {
+            id: formData.id || `CT-${Date.now()}`,
+            type: formData.type!,
+            date: new Date(formData.date!).toISOString(),
+            amount: formData.amount,
+            contact: finalContact,
+            notes: formData.notes || '',
+            paymentSourceId: formData.paymentSourceId,
+            branchId: formData.branchId!,
+        };
+        onSave(finalTransaction);
     };
 
-    const filteredContacts = contacts.filter(c => c.name.toLowerCase().includes(contactSearch.toLowerCase()) || (c.phone && c.phone.includes(contactSearch)));
-    
     if (!isOpen) return null;
-    
-    const title = type === 'income' ? 'Tạo phiếu thu (Tôi nhận tiền)' : 'Tạo phiếu chi (Tôi đưa tiền)';
-    const contactLabel = type === 'income' ? 'Tôi nhận tiền của ai?' : 'Tôi đưa tiền cho ai?';
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-xl max-h-[95vh] flex flex-col">
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg">
                 <div className="p-4 border-b dark:border-slate-700 flex justify-between items-center">
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">{title}</h2>
-                    <button onClick={onClose}><XMarkIcon className="w-6 h-6 text-slate-500 dark:text-slate-300" /></button>
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{transaction?.id ? 'Sửa Giao dịch' : 'Tạo Giao dịch Mới'}</h3>
+                    <button onClick={onClose}><XMarkIcon className="w-6 h-6 text-slate-500 dark:text-slate-400" /></button>
                 </div>
-                <div className="p-6 space-y-4 overflow-y-auto">
-                    <div className="relative">
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">{contactLabel} <span className="text-red-500">*</span></label>
-                        <div className="flex items-center mt-1">
-                            <input type="text" placeholder="Nhập từ khoá cần tìm" value={contactSearch}
-                                onChange={e => { setContactSearch(e.target.value); setSelectedContact(null); setIsContactListOpen(true); }}
-                                onFocus={() => setIsContactListOpen(true)}
-                                className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-l-md dark:bg-slate-700 dark:text-white"
-                            />
-                            <button onClick={onAddNewContact} className="p-2 border-t border-b border-r rounded-r-md h-[42px] bg-slate-50 dark:bg-slate-600 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-500"><PlusIcon /></button>
+                <div className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Loại giao dịch</label>
+                        <div className="flex gap-4">
+                            <button onClick={() => setFormData(d => ({...d, type: 'income'}))} className={`flex-1 flex items-center justify-center gap-2 p-3 border-2 rounded-lg ${formData.type === 'income' ? 'border-green-500 bg-green-50 dark:bg-green-900/50' : 'border-slate-300 dark:border-slate-600'}`}>
+                                <ArrowUpCircleIcon className="w-6 h-6 text-green-600 dark:text-green-400" /> <span className="font-semibold text-slate-800 dark:text-slate-200">Phiếu Thu</span>
+                            </button>
+                            <button onClick={() => setFormData(d => ({...d, type: 'expense'}))} className={`flex-1 flex items-center justify-center gap-2 p-3 border-2 rounded-lg ${formData.type === 'expense' ? 'border-red-500 bg-red-50 dark:bg-red-900/50' : 'border-slate-300 dark:border-slate-600'}`}>
+                                <ArrowDownCircleIcon className="w-6 h-6 text-red-600 dark:text-red-400" /> <span className="font-semibold text-slate-800 dark:text-slate-200">Phiếu Chi</span>
+                            </button>
                         </div>
-                        {isContactListOpen && (
-                             <div className="absolute z-10 w-full bg-white dark:bg-slate-700 border dark:border-slate-600 rounded-md mt-1 shadow-lg max-h-48 overflow-y-auto">
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Ngày</label>
+                            <input type="datetime-local" value={formData.date || ''} onChange={e => setFormData(d => ({ ...d, date: e.target.value }))} className="mt-1 w-full p-2 border dark:border-slate-600 rounded-md dark:bg-slate-800 dark:text-white [color-scheme:light] dark:[color-scheme:dark]" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Số tiền (*)</label>
+                            <input type="number" value={formData.amount || ''} onChange={e => setFormData(d => ({ ...d, amount: Number(e.target.value) }))} className="mt-1 w-full p-2 border dark:border-slate-600 rounded-md dark:bg-slate-800 dark:text-white" autoFocus />
+                        </div>
+                    </div>
+                     <div ref={contactInputRef}>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Đối tượng (*)</label>
+                        <div className="relative mt-1">
+                            <input type="text" placeholder="Tìm khách hàng/NCC hoặc nhập tên mới" value={contactSearch}
+                                onChange={e => { setContactSearch(e.target.value); setIsContactListOpen(true); setFormData(d => ({...d, contact: undefined})); }}
+                                onFocus={() => setIsContactListOpen(true)}
+                                className="w-full p-2 border dark:border-slate-600 rounded-md dark:bg-slate-800 dark:text-white"
+                            />
+                            {isContactListOpen && (
+                            <div className="absolute z-10 w-full bg-white dark:bg-slate-700 border dark:border-slate-600 rounded-md mt-1 shadow-lg max-h-40 overflow-y-auto">
                                 {filteredContacts.map(c => (
-                                    <div key={c.id} onClick={() => { setSelectedContact(c); setContactSearch(c.name); setIsContactListOpen(false); }}
-                                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-600 cursor-pointer text-sm text-slate-800 dark:text-slate-200">
-                                        {c.name} {c.phone && <span className="text-slate-500 dark:text-slate-400">- {c.phone}</span>}
+                                <div key={c.id} onClick={() => handleSelectContact(c)}
+                                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-600 cursor-pointer text-sm text-slate-800 dark:text-slate-200">
+                                    {c.name}
+                                </div>
+                                ))}
+                            </div>
+                            )}
+                        </div>
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Nguồn tiền (*)</label>
+                        <select value={formData.paymentSourceId || ''} onChange={e => setFormData(d => ({ ...d, paymentSourceId: e.target.value }))} className="mt-1 w-full p-2 border dark:border-slate-600 rounded-md dark:bg-slate-800 dark:text-white">
+                            <option value="">-- Chọn nguồn tiền --</option>
+                            {paymentSources.map(ps => <option key={ps.id} value={ps.id}>{ps.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Ghi chú</label>
+                        <textarea value={formData.notes || ''} onChange={e => setFormData(d => ({ ...d, notes: e.target.value }))} className="mt-1 w-full p-2 border dark:border-slate-600 rounded-md dark:bg-slate-800 dark:text-white" rows={2}></textarea>
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t dark:border-slate-700 flex justify-end gap-3">
+                    <button onClick={onClose} className="bg-slate-200 text-slate-800 dark:bg-slate-600 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg">Hủy</button>
+                    <button onClick={handleSave} className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg">Lưu</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Settings Modal
+const SettingsModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (sources: PaymentSource[]) => void;
+    paymentSources: PaymentSource[];
+    storeSettings: StoreSettings;
+}> = ({ isOpen, onClose, onSave, paymentSources, storeSettings }) => {
+    const [localSources, setLocalSources] = useState<PaymentSource[]>([]);
+
+    useEffect(() => {
+        if (isOpen) {
+            setLocalSources(JSON.parse(JSON.stringify(paymentSources)));
+        }
+    }, [isOpen, paymentSources]);
+
+    const handleBalanceChange = (sourceId: string, branchId: string, newBalance: number) => {
+        setLocalSources(prev => prev.map(source => {
+            if (source.id === sourceId) {
+                const updatedBalance = { ...source.balance, [branchId]: newBalance };
+                return { ...source, balance: updatedBalance };
+            }
+            return source;
+        }));
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-2xl">
+                <div className="p-4 border-b dark:border-slate-700">
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Thiết lập Nguồn tiền</h3>
+                </div>
+                <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+                    {localSources.map(source => (
+                        <div key={source.id} className="p-4 border dark:border-slate-700 rounded-lg">
+                            <h4 className="font-semibold text-slate-800 dark:text-slate-100 mb-2">{source.name}</h4>
+                            <div className="space-y-2">
+                                {storeSettings.branches.map(branch => (
+                                    <div key={branch.id} className="grid grid-cols-3 items-center gap-4">
+                                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300 col-span-1">{branch.name}:</label>
+                                        <input
+                                            type="number"
+                                            value={source.balance[branch.id] || 0}
+                                            onChange={e => handleBalanceChange(source.id, branch.id, Number(e.target.value))}
+                                            className="col-span-2 w-full p-2 border dark:border-slate-600 rounded-md dark:bg-slate-800 dark:text-white"
+                                        />
                                     </div>
                                 ))}
                             </div>
-                        )}
-                        {selectedContact && <div className="mt-2 p-2 bg-sky-50 dark:bg-sky-900/50 border border-sky-200 dark:border-sky-700 rounded-md text-sky-800 dark:text-sky-300 font-semibold">{selectedContact.name}</div>}
-                    </div>
-                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Số tiền thanh toán</label>
-                        <input type="number" placeholder="0" value={amount} onChange={e => setAmount(Number(e.target.value))} className="mt-1 w-full p-2 border dark:border-slate-600 rounded-md dark:bg-slate-700 dark:text-white"/>
-                    </div>
-                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Nội dung ghi chú</label>
-                        <textarea rows={3} value={notes} onChange={e => setNotes(e.target.value)} className="mt-1 w-full p-2 border dark:border-slate-600 rounded-md dark:bg-slate-700 dark:text-white"></textarea>
-                    </div>
-                    <div>
-                        <div className="flex justify-between items-center">
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Hình thức thanh toán</label>
-                            <button onClick={onConfigureSources} className="text-xs text-orange-600 dark:text-orange-400 hover:underline flex items-center"><Cog6ToothIcon className="w-4 h-4 mr-1"/> Thiết lập nguồn tiền</button>
                         </div>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                           {paymentSources.map(ps => (
-                               <button key={ps.id} onClick={() => setSelectedPaymentSourceId(ps.id)} className={`p-3 border rounded-lg text-left ${selectedPaymentSourceId === ps.id ? 'border-sky-500 bg-sky-50 dark:bg-sky-900/50 ring-2 ring-sky-300' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'}`}>
-                                   <p className="font-semibold text-slate-800 dark:text-slate-200">{ps.name}</p>
-                                   <p className="text-sm text-slate-600 dark:text-slate-400">{formatCurrency(ps.balance)}</p>
-                               </button>
-                           ))}
-                        </div>
-                    </div>
-                    <div className="text-slate-700 dark:text-slate-300">
-                        <label className="block text-sm font-medium">Thời gian thanh toán</label>
-                        <div className="flex gap-4 mt-2">
-                           <label className="flex items-center"><input type="radio" checked={useCurrentTime} onChange={() => setUseCurrentTime(true)} className="mr-1"/> Thời gian hiện tại</label>
-                           <label className="flex items-center"><input type="radio" checked={!useCurrentTime} onChange={() => setUseCurrentTime(false)} className="mr-1"/> Tùy chỉnh</label>
-                        </div>
-                        {!useCurrentTime && <input type="datetime-local" value={customDate} onChange={e => setCustomDate(e.target.value)} className="mt-2 p-2 border dark:border-slate-600 rounded-md w-full sm:w-auto dark:bg-slate-700 dark:text-white"/>}
-                        {useCurrentTime && <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 p-2 border dark:border-slate-600 rounded-md bg-slate-50 dark:bg-slate-700 inline-block">{new Date().toLocaleString('vi-VN')}</p>}
-                    </div>
+                    ))}
                 </div>
-                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t dark:border-slate-700 flex justify-end">
-                    <button onClick={handleSave} className="bg-orange-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-orange-600">LƯU</button>
+                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t dark:border-slate-700 flex justify-end gap-3">
+                    <button onClick={onClose} className="bg-slate-200 text-slate-800 dark:bg-slate-600 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg">Hủy</button>
+                    <button onClick={() => onSave(localSources)} className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg">Lưu</button>
                 </div>
             </div>
         </div>
@@ -196,236 +221,295 @@ const TransactionModal: React.FC<{
 };
 
 
-// --- Main Component ---
+// --- MAIN COMPONENT ---
 interface CashflowManagerProps {
     cashTransactions: CashTransaction[];
     setCashTransactions: React.Dispatch<React.SetStateAction<CashTransaction[]>>;
     paymentSources: PaymentSource[];
     setPaymentSources: React.Dispatch<React.SetStateAction<PaymentSource[]>>;
     customers: Customer[];
-    setCustomers: React.Dispatch<React.SetStateAction<Customer[]>>;
     suppliers: Supplier[];
-    setSuppliers: React.Dispatch<React.SetStateAction<Supplier[]>>;
     currentBranchId: string;
+    storeSettings: StoreSettings;
 }
 
-const ITEMS_PER_PAGE = 20;
+const ITEMS_PER_PAGE = 15;
 
-const CashflowManager: React.FC<CashflowManagerProps> = ({ cashTransactions, setCashTransactions, paymentSources, setPaymentSources, customers, suppliers, setCustomers, setSuppliers, currentBranchId }) => {
-    const [modalState, setModalState] = useState<{ type: 'income' | 'expense' | null, isOpen: boolean }>({ type: null, isOpen: false });
-    const [isContactModalOpen, setIsContactModalOpen] = useState(false);
-    const [isSourceConfigOpen, setIsSourceConfigOpen] = useState(false); // Placeholder for future modal
+const CashflowManager: React.FC<CashflowManagerProps> = ({
+    cashTransactions, setCashTransactions,
+    paymentSources, setPaymentSources,
+    customers, suppliers,
+    currentBranchId, storeSettings,
+}) => {
+    const [activeTab, setActiveTab] = useState<'balance' | 'history' | 'overview'>('balance');
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingTransaction, setEditingTransaction] = useState<Partial<CashTransaction> | null>(null);
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
-
-    const today = new Date();
-    const lastMonth = new Date(today);
-    lastMonth.setDate(today.getDate() - 30);
     
-    const [startDate, setStartDate] = useState(lastMonth.toISOString().split('T')[0]);
+    // Overview Tab State
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    const [startDate, setStartDate] = useState(thirtyDaysAgo.toISOString().split('T')[0]);
     const [endDate, setEndDate] = useState(today.toISOString().split('T')[0]);
 
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [startDate, endDate]);
+    const allContacts = useMemo(() => [
+        ...customers.map(c => ({ id: c.id, name: c.name })),
+        ...suppliers.map(s => ({ id: s.id, name: s.name })),
+    ], [customers, suppliers]);
 
-    const combinedContacts = useMemo(() => {
-        const allContacts: { id: string, name: string, phone?: string }[] = [];
-        customers.forEach(c => allContacts.push({ id: c.id, name: c.name, phone: c.phone }));
-        suppliers.forEach(s => allContacts.push({ id: s.id, name: s.name, phone: s.phone }));
-        return allContacts;
-    }, [customers, suppliers]);
-
-    const handleOpenModal = (type: 'income' | 'expense') => {
-        setModalState({ type, isOpen: true });
+    const handleOpenModal = (tx: Partial<CashTransaction> | null = null) => {
+        setEditingTransaction(tx);
+        setIsModalOpen(true);
     };
 
-    const handleCloseModal = () => {
-        setModalState({ type: null, isOpen: false });
-    };
-    
-    const handleSaveContact = (contact: Omit<Contact, 'id'>) => {
-        if(contact.type.includes('Nhà cung cấp')) {
-            const newSupplier: Supplier = { id: `SUP${Date.now()}`, ...contact, phone: contact.phone || '' };
-            setSuppliers(prev => [newSupplier, ...prev]);
+    const handleSaveTransaction = (transaction: CashTransaction) => {
+        const isEditing = cashTransactions.some(t => t.id === transaction.id);
+        let oldTransaction: CashTransaction | undefined;
+
+        if (isEditing) {
+            oldTransaction = cashTransactions.find(t => t.id === transaction.id);
+            setCashTransactions(prev => prev.map(t => t.id === transaction.id ? transaction : t));
         } else {
-            const newCustomer: Customer = { id: `C${Date.now()}`, vehicle: '', licensePlate: '', loyaltyPoints: 0, ...contact, phone: contact.phone || '' };
-            setCustomers(prev => [newCustomer, ...prev]);
+            setCashTransactions(prev => [transaction, ...prev]);
         }
-    };
-    
-    const handleSaveTransaction = (transactionData: Omit<CashTransaction, 'id' | 'branchId'>) => {
-        const newTransaction: CashTransaction = {
-            ...transactionData,
-            id: `CT-${Date.now()}`,
-            branchId: currentBranchId,
-        };
-
-        setCashTransactions(prev => [newTransaction, ...prev]);
 
         setPaymentSources(prevSources => prevSources.map(ps => {
-            if (ps.id === newTransaction.paymentSourceId) {
-                const newBalance = newTransaction.type === 'income'
-                    ? ps.balance + newTransaction.amount
-                    : ps.balance - newTransaction.amount;
+            const newBalance = { ...ps.balance };
+            let balanceChanged = false;
+
+            if (oldTransaction && oldTransaction.paymentSourceId === ps.id) {
+                const change = oldTransaction.type === 'income' ? -oldTransaction.amount : oldTransaction.amount;
+                newBalance[oldTransaction.branchId] = (newBalance[oldTransaction.branchId] || 0) + change;
+                balanceChanged = true;
+            }
+            
+            if (transaction.paymentSourceId === ps.id) {
+                const change = transaction.type === 'income' ? transaction.amount : -transaction.amount;
+                newBalance[transaction.branchId] = (newBalance[transaction.branchId] || 0) + change;
+                balanceChanged = true;
+            }
+            
+            return balanceChanged ? { ...ps, balance: newBalance } : ps;
+        }));
+
+        setIsModalOpen(false);
+        setEditingTransaction(null);
+    };
+
+    const handleDeleteTransaction = (transactionId: string) => {
+        const transactionToDelete = cashTransactions.find(t => t.id === transactionId);
+        if (!transactionToDelete || !window.confirm('Bạn có chắc muốn xóa giao dịch này không? Hành động này sẽ hoàn tác số dư trong quỹ.')) return;
+
+        setPaymentSources(prevSources => prevSources.map(ps => {
+            if (ps.id === transactionToDelete.paymentSourceId) {
+                const newBalance = { ...ps.balance };
+                const change = transactionToDelete.type === 'income' ? -transactionToDelete.amount : transactionToDelete.amount;
+                newBalance[transactionToDelete.branchId] = (newBalance[transactionToDelete.branchId] || 0) + change;
                 return { ...ps, balance: newBalance };
             }
             return ps;
         }));
 
-        handleCloseModal();
-    };
-    
-    // --- Filtering Logic ---
-    const handleSetDateRange = (start: Date, end: Date) => {
-        setStartDate(start.toISOString().split('T')[0]);
-        setEndDate(end.toISOString().split('T')[0]);
+        setCashTransactions(prev => prev.filter(t => t.id !== transactionId));
     };
 
-    const handleTodayClick = () => { const today = new Date(); handleSetDateRange(today, today); };
-    const handleThisWeekClick = () => {
-        const today = new Date();
-        const firstDay = today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1);
-        const start = new Date(today.setDate(firstDay));
-        const end = new Date(start);
-        end.setDate(start.getDate() + 6);
-        handleSetDateRange(start, end);
+    const handleSaveSettings = (newSources: PaymentSource[]) => {
+        setPaymentSources(newSources);
+        setIsSettingsModalOpen(false);
     };
-    const handleThisMonthClick = () => { const today = new Date(); handleSetDateRange(new Date(today.getFullYear(), today.getMonth(), 1), new Date(today.getFullYear(), today.getMonth() + 1, 0)); };
-    const handleThisYearClick = () => { const today = new Date(); handleSetDateRange(new Date(today.getFullYear(), 0, 1), new Date(today.getFullYear(), 11, 31)); };
-
 
     const filteredTransactions = useMemo(() => {
-        if (!startDate || !endDate) {
-          return [...cashTransactions].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        }
-        const start = new Date(`${startDate}T00:00:00`);
-        const end = new Date(`${endDate}T23:59:59`);
         return cashTransactions
-          .filter(tx => {
-              const txDate = new Date(tx.date);
-              return txDate >= start && txDate <= end;
-          })
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [cashTransactions, startDate, endDate]);
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [cashTransactions]);
 
     const paginatedTransactions = useMemo(() => {
+        const branchTransactions = filteredTransactions.filter(t => t.branchId === currentBranchId);
         const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-        return filteredTransactions.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-    }, [filteredTransactions, currentPage]);
+        return branchTransactions.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filteredTransactions, currentPage, currentBranchId]);
 
-    const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE);
-
-    const summary = useMemo(() => {
-        return filteredTransactions.reduce((acc, tx) => {
-            if (tx.type === 'income') acc.totalIncome += tx.amount;
-            else acc.totalExpense += tx.amount;
-            return acc;
-        }, { totalIncome: 0, totalExpense: 0 });
-    }, [filteredTransactions]);
-
-
-  return (
-    <div className="space-y-6">
-        {modalState.isOpen && modalState.type && (
-            <TransactionModal 
-                isOpen={true}
-                onClose={handleCloseModal}
-                onSave={handleSaveTransaction}
-                type={modalState.type}
-                contacts={combinedContacts}
-                paymentSources={paymentSources}
-                onAddNewContact={() => setIsContactModalOpen(true)}
-                onConfigureSources={() => alert('Chức năng đang phát triển')}
-            />
-        )}
-        <ContactModal 
-            isOpen={isContactModalOpen}
-            onClose={() => setIsContactModalOpen(false)}
-            onSave={handleSaveContact}
-        />
-
-        <div className="flex flex-col sm:flex-row justify-end sm:items-center gap-4">
-            <div className="flex items-center gap-3">
-                 <button onClick={() => handleOpenModal('expense')} className="flex items-center gap-2 bg-red-100 text-red-700 font-semibold py-2 px-4 rounded-lg shadow-sm hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900/80">
-                    <ArrowDownCircleIcon className="w-6 h-6" /> Tôi đã đưa
-                </button>
-                <button onClick={() => handleOpenModal('income')} className="flex items-center gap-2 bg-green-100 text-green-700 font-semibold py-2 px-4 rounded-lg shadow-sm hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900/80">
-                    <ArrowUpCircleIcon className="w-6 h-6" /> Tôi đã nhận
-                </button>
-            </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm flex items-center border dark:border-slate-700"><div className="p-4 rounded-full bg-green-100 dark:bg-green-900/50"><ArrowUpCircleIcon className="w-7 h-7 text-green-600 dark:text-green-400" /></div><div className="ml-4"><p className="text-sm text-slate-500 dark:text-slate-400">Tổng thu trong kỳ</p><p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(summary.totalIncome)}</p></div></div>
-            <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm flex items-center border dark:border-slate-700"><div className="p-4 rounded-full bg-red-100 dark:bg-red-900/50"><ArrowDownCircleIcon className="w-7 h-7 text-red-600 dark:text-red-400" /></div><div className="ml-4"><p className="text-sm text-slate-500 dark:text-slate-400">Tổng chi trong kỳ</p><p className="text-2xl font-bold text-red-600 dark:text-red-400">{formatCurrency(summary.totalExpense)}</p></div></div>
-        </div>
+    const totalPages = Math.ceil(filteredTransactions.filter(t => t.branchId === currentBranchId).length / ITEMS_PER_PAGE);
+    
+    // NEW: Memoized data for overview tab
+    const overviewData = useMemo(() => {
+        const start = new Date(`${startDate}T00:00:00`);
+        const end = new Date(`${endDate}T23:59:59`);
         
-        <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Từ ngày</label>
-                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="mt-1 block w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm dark:bg-slate-700 dark:text-white [color-scheme:light] dark:[color-scheme:dark]" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Đến ngày</label>
-                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="mt-1 block w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm dark:bg-slate-700 dark:text-white [color-scheme:light] dark:[color-scheme:dark]" />
-                </div>
-                <div className="lg:col-span-3 flex flex-wrap items-end gap-2">
-                    <button onClick={handleTodayClick} className="px-3 py-2 border dark:border-slate-600 rounded-md text-sm font-medium bg-slate-100 dark:bg-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600">Hôm nay</button>
-                    <button onClick={handleThisWeekClick} className="px-3 py-2 border dark:border-slate-600 rounded-md text-sm font-medium bg-slate-100 dark:bg-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600">Tuần này</button>
-                    <button onClick={handleThisMonthClick} className="px-3 py-2 border dark:border-slate-600 rounded-md text-sm font-medium bg-slate-100 dark:bg-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600">Tháng này</button>
-                    <button onClick={handleThisYearClick} className="px-3 py-2 border dark:border-slate-600 rounded-md text-sm font-medium bg-slate-100 dark:bg-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600">Năm nay</button>
-                    <button onClick={() => {setStartDate(''); setEndDate('');}} className="px-3 py-2 border dark:border-slate-600 rounded-md text-sm font-medium bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-red-600 dark:text-red-400">Bỏ lọc</button>
+        const relevantTransactions = cashTransactions.filter(tx => {
+            const txDate = new Date(tx.date);
+            return txDate >= start && txDate <= end;
+        });
+
+        let totalIncome = 0;
+        let totalExpense = 0;
+        
+        const branchBreakdown: { [branchId: string]: { name: string, income: number, expense: number } } = {};
+        storeSettings.branches.forEach(branch => {
+            branchBreakdown[branch.id] = { name: branch.name, income: 0, expense: 0 };
+        });
+
+        relevantTransactions.forEach(tx => {
+            if (tx.type === 'income') {
+                totalIncome += tx.amount;
+                if (branchBreakdown[tx.branchId]) {
+                    branchBreakdown[tx.branchId].income += tx.amount;
+                }
+            } else {
+                totalExpense += tx.amount;
+                if (branchBreakdown[tx.branchId]) {
+                    branchBreakdown[tx.branchId].expense += tx.amount;
+                }
+            }
+        });
+        
+        return {
+            totalIncome,
+            totalExpense,
+            totalNet: totalIncome - totalExpense,
+            branchData: Object.values(branchBreakdown)
+        };
+    }, [cashTransactions, startDate, endDate, storeSettings.branches]);
+
+    return (
+        <div className="space-y-6">
+            <TransactionModal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setEditingTransaction(null); }} onSave={handleSaveTransaction} transaction={editingTransaction} contacts={allContacts} paymentSources={paymentSources} currentBranchId={currentBranchId} />
+            <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} onSave={handleSaveSettings} paymentSources={paymentSources} storeSettings={storeSettings} />
+            
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 dark:text-slate-100">Thu – Chi & Tồn quỹ</h1>
+                <div className="flex gap-2 flex-wrap">
+                    <button onClick={() => setIsSettingsModalOpen(true)} className="flex items-center gap-2 bg-slate-500 text-white font-semibold py-2 px-4 rounded-lg shadow-sm hover:bg-slate-600">
+                        <Cog6ToothIcon className="w-5 h-5"/>
+                    </button>
+                    <button onClick={() => handleOpenModal({type: 'income'})} className="flex items-center gap-2 bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-sm hover:bg-green-700">
+                        <PlusIcon className="w-5 h-5"/> Phiếu Thu
+                    </button>
+                    <button onClick={() => handleOpenModal({type: 'expense'})} className="flex items-center gap-2 bg-red-500 text-white font-semibold py-2 px-4 rounded-lg shadow-sm hover:bg-red-600">
+                       <PlusIcon className="w-5 h-5"/> Phiếu Chi
+                    </button>
                 </div>
             </div>
-        </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 overflow-x-auto">
-            <table className="w-full text-left">
-                <thead className="border-b dark:border-slate-700">
-                    <tr className="bg-slate-100 dark:bg-slate-700/50">
-                        <th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Thời gian</th>
-                        <th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Đối tác</th>
-                        <th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Nội dung</th>
-                        <th className="p-3 font-semibold text-slate-700 dark:text-slate-300 text-right">Đã thu</th>
-                        <th className="p-3 font-semibold text-slate-700 dark:text-slate-300 text-right">Đã chi</th>
-                        <th className="p-3 font-semibold text-slate-700 dark:text-slate-300">Nguồn tiền</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {paginatedTransactions.length > 0 ? paginatedTransactions.map(tx => {
-                        const source = paymentSources.find(ps => ps.id === tx.paymentSourceId);
+             <div className="border-b border-slate-200 dark:border-slate-700">
+                <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+                    <button onClick={() => setActiveTab('balance')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'balance' ? 'border-sky-500 text-sky-600 dark:text-sky-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 hover:border-slate-300 dark:hover:border-slate-600'}`}>Tồn quỹ</button>
+                    <button onClick={() => setActiveTab('overview')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'overview' ? 'border-sky-500 text-sky-600 dark:text-sky-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 hover:border-slate-300 dark:hover:border-slate-600'}`}>Tổng quan Thu Chi</button>
+                    <button onClick={() => setActiveTab('history')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'history' ? 'border-sky-500 text-sky-600 dark:text-sky-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 hover:border-slate-300 dark:hover:border-slate-600'}`}>Lịch sử Giao dịch</button>
+                </nav>
+            </div>
+            
+            {activeTab === 'balance' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {paymentSources.map(source => {
+                        const totalBalance = Object.values(source.balance).reduce((acc: number, val: number) => acc + val, 0);
                         return (
-                        <tr key={tx.id} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-sm">
-                            <td className="p-3 text-slate-700 dark:text-slate-300">{new Date(tx.date).toLocaleString('vi-VN')}</td>
-                            <td className="p-3 font-medium text-slate-800 dark:text-slate-200">{tx.contact.name}</td>
-                            <td className="p-3 text-slate-600 dark:text-slate-400">{tx.notes}</td>
-                            <td className="p-3 text-right font-semibold text-green-600 dark:text-green-400">{tx.type === 'income' ? formatCurrency(tx.amount) : ''}</td>
-                            <td className="p-3 text-right font-semibold text-red-600 dark:text-red-400">{tx.type === 'expense' ? formatCurrency(tx.amount) : ''}</td>
-                            <td className="p-3 text-slate-700 dark:text-slate-300">{source?.name || 'N/A'}</td>
-                        </tr>
-                    )}) : (
-                         <tr>
-                            <td colSpan={6} className="text-center p-16 text-slate-500 dark:text-slate-400">
-                                Không có giao dịch nào trong khoảng thời gian đã chọn.
-                            </td>
-                        </tr>
-                    )}
-                </tbody>
-            </table>
+                            <div key={source.id} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border dark:border-slate-700 space-y-3">
+                                <h3 className="font-semibold text-lg text-slate-800 dark:text-slate-100">{source.name}</h3>
+                                {storeSettings.branches.map(branch => (
+                                    <div key={branch.id} className="flex justify-between items-center text-sm">
+                                        <span className="text-slate-600 dark:text-slate-400">{branch.name}:</span>
+                                        <span className="font-medium text-slate-800 dark:text-slate-200">{formatCurrency(source.balance[branch.id] || 0)}</span>
+                                    </div>
+                                ))}
+                                <div className="border-t dark:border-slate-600 pt-3 flex justify-between items-center font-bold">
+                                    <span className="text-slate-800 dark:text-slate-100">Tổng cộng:</span>
+                                    <span className="text-sky-600 dark:text-sky-400 text-lg">{formatCurrency(totalBalance)}</span>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+
+            {activeTab === 'overview' && (
+                <div className="space-y-6">
+                     <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border dark:border-slate-700 flex flex-col sm:flex-row gap-4 items-center">
+                        <div className="flex-1 w-full"><label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Từ ngày</label><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="mt-1 block w-full p-2 border dark:border-slate-600 rounded-md dark:bg-slate-700 dark:text-white" /></div>
+                        <div className="flex-1 w-full"><label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Đến ngày</label><input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="mt-1 block w-full p-2 border dark:border-slate-600 rounded-md dark:bg-slate-700 dark:text-white" /></div>
+                    </div>
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="bg-green-50 dark:bg-green-900/50 p-4 rounded-lg border border-green-200 dark:border-green-800">
+                            <p className="text-sm font-medium text-green-800 dark:text-green-300">Tổng Thu</p><p className="text-2xl font-bold text-green-800 dark:text-green-200">{formatCurrency(overviewData.totalIncome)}</p>
+                        </div>
+                        <div className="bg-red-50 dark:bg-red-900/50 p-4 rounded-lg border border-red-200 dark:border-red-800">
+                             <p className="text-sm font-medium text-red-800 dark:text-red-300">Tổng Chi</p><p className="text-2xl font-bold text-red-800 dark:text-red-200">{formatCurrency(overviewData.totalExpense)}</p>
+                        </div>
+                         <div className="bg-sky-50 dark:bg-sky-900/50 p-4 rounded-lg border border-sky-200 dark:border-sky-800">
+                             <p className="text-sm font-medium text-sky-800 dark:text-sky-300">Lợi nhuận</p><p className={`text-2xl font-bold ${overviewData.totalNet >= 0 ? 'text-sky-800 dark:text-sky-200' : 'text-red-600 dark:text-red-400'}`}>{formatCurrency(overviewData.totalNet)}</p>
+                        </div>
+                    </div>
+                     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 overflow-x-auto">
+                        <table className="w-full text-left min-w-max">
+                            <thead className="border-b dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50">
+                                <tr>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Chi nhánh</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Tổng Thu</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Tổng Chi</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Lợi nhuận</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {overviewData.branchData.map(branch => {
+                                    const net = branch.income - branch.expense;
+                                    return (
+                                        <tr key={branch.name} className="border-t dark:border-slate-700">
+                                            <td className="p-3 font-medium text-slate-800 dark:text-slate-200">{branch.name}</td>
+                                            <td className="p-3 text-right text-green-600 dark:text-green-400">{formatCurrency(branch.income)}</td>
+                                            <td className="p-3 text-right text-red-600 dark:text-red-400">{formatCurrency(branch.expense)}</td>
+                                            <td className={`p-3 text-right font-semibold ${net >= 0 ? 'text-sky-600 dark:text-sky-400' : 'text-red-600 dark:text-red-400'}`}>{formatCurrency(net)}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'history' && (
+                <>
+                    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200/60 dark:border-slate-700 overflow-x-auto">
+                        <table className="w-full text-left min-w-max">
+                            <thead className="border-b dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50">
+                                <tr>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Ngày</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Loại</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Đối tượng</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Số tiền</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Nguồn tiền</th>
+                                    <th className="p-3 font-semibold text-slate-600 dark:text-slate-300">Chi nhánh</th>
+                                    <th className="p-3"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paginatedTransactions.map(tx => (
+                                    <tr key={tx.id} className="border-t dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                        <td className="p-3 text-slate-700 dark:text-slate-300 text-sm">{new Date(tx.date).toLocaleString('vi-VN')}</td>
+                                        <td className="p-3"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${tx.type === 'income' ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'}`}>{tx.type === 'income' ? 'Thu' : 'Chi'}</span></td>
+                                        <td className="p-3 font-medium text-slate-800 dark:text-slate-200">{tx.contact.name}</td>
+                                        <td className={`p-3 text-right font-semibold ${tx.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{tx.type === 'income' ? '+' : '-'} {formatCurrency(tx.amount)}</td>
+                                        <td className="p-3 text-slate-700 dark:text-slate-300">{paymentSources.find(p => p.id === tx.paymentSourceId)?.name}</td>
+                                        <td className="p-3 text-slate-700 dark:text-slate-300">{storeSettings.branches.find(b => b.id === tx.branchId)?.name}</td>
+                                        <td className="p-3">
+                                            <div className="flex items-center gap-2">
+                                                <button onClick={() => handleOpenModal(tx)} className="p-1 text-sky-600 dark:text-sky-400"><PencilSquareIcon className="w-5 h-5"/></button>
+                                                <button onClick={() => handleDeleteTransaction(tx.id)} className="p-1 text-red-500"><TrashIcon className="w-5 h-5"/></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {paginatedTransactions.length === 0 && <div className="text-center p-8 text-slate-500 dark:text-slate-400">Chưa có giao dịch nào cho chi nhánh này.</div>}
+                    </div>
+                    {totalPages > 1 && <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} itemsPerPage={ITEMS_PER_PAGE} totalItems={filteredTransactions.filter(t => t.branchId === currentBranchId).length} />}
+                </>
+            )}
         </div>
-        
-        {filteredTransactions.length > 0 && (
-            <Pagination 
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-                itemsPerPage={ITEMS_PER_PAGE}
-                totalItems={filteredTransactions.length}
-            />
-        )}
-    </div>
-  );
+    );
 };
 
 export default CashflowManager;

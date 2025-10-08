@@ -88,8 +88,11 @@ export interface WorkOrder {
   processingType?: string;
   customerQuote?: number;
   discount?: number;
-  odometerReading?: number;
-  serviceTypes?: string[];
+  mileage?: number;
+  paymentStatus?: 'paid' | 'unpaid';
+  paymentMethod?: 'cash' | 'bank';
+  paymentDate?: string;
+  cashTransactionId?: string;
 }
 
 export interface Customer {
@@ -99,8 +102,6 @@ export interface Customer {
   vehicle: string;
   licensePlate: string;
   loyaltyPoints: number;
-  lastServiceOdometer?: number;
-  lastServiceDate?: string;
 }
 
 export interface InventoryTransaction {
@@ -145,7 +146,7 @@ export interface Supplier {
 export interface PaymentSource {
     id: string;
     name: string;
-    balance: number;
+    balance: { [branchId: string]: number };
     isDefault?: boolean;
 }
 
@@ -161,6 +162,8 @@ export interface CashTransaction {
     notes: string;
     paymentSourceId: string;
     branchId: string;
+    saleId?: string;
+    workOrderId?: string;
 }
 
 export interface ReceiptItem {
@@ -180,4 +183,25 @@ export interface Contact {
     name: string;
     phone?: string;
     type: ContactType[];
+}
+
+export interface FixedAsset {
+  id: string;
+  name: string;
+  purchaseDate: string;
+  purchasePrice: number;
+  description?: string;
+  usefulLife?: number; // in years
+  salvageValue?: number;
+  branchId: string;
+}
+
+export interface CapitalInvestment {
+  id: string;
+  date: string;
+  amount: number;
+  description: string;
+  source: 'Vốn chủ sở hữu' | 'Vay ngân hàng';
+  interestRate?: number; // in percent
+  branchId: string;
 }

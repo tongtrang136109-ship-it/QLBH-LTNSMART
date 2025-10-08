@@ -1,6 +1,6 @@
 import React, { useState, useId } from 'react';
 import { NavLink } from 'react-router-dom';
-import { DashboardIcon, WrenchScrewdriverIcon, ArchiveBoxIcon, UsersIcon, SparklesIcon, ShoppingCartIcon, UserGroupIcon, Cog6ToothIcon, ChartBarIcon, DocumentChartBarIcon, XMarkIcon, ArrowRightEndOnRectangleIcon, PlusIcon, TrashIcon, BuildingLibraryIcon, SunIcon, MoonIcon, ComputerDesktopIcon, ArrowUturnLeftIcon } from './common/Icons';
+import { DashboardIcon, WrenchScrewdriverIcon, ArchiveBoxIcon, UsersIcon, SparklesIcon, ShoppingCartIcon, UserGroupIcon, Cog6ToothIcon, ChartBarIcon, DocumentChartBarIcon, XMarkIcon, ArrowRightEndOnRectangleIcon, PlusIcon, TrashIcon, BuildingLibraryIcon, SunIcon, MoonIcon, ComputerDesktopIcon, ChartPieIcon } from './common/Icons';
 import type { User, StoreSettings, Department } from '../types';
 import type { Theme } from '../App';
 
@@ -120,9 +120,8 @@ const StoreSettingsModal: React.FC<{
                     </fieldset>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 flex justify-end space-x-3 mt-auto border-t border-slate-200 dark:border-slate-700">
-                    <button type="button" onClick={onClose} className="flex items-center gap-2 bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600">
-                        <ArrowUturnLeftIcon className="w-5 h-5" />
-                        Trở về
+                    <button type="button" onClick={onClose} className="bg-slate-200 text-slate-800 dark:bg-slate-600 dark:text-slate-200 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors">
+                        Hủy
                     </button>
                     <button type="button" onClick={handleSave} className="bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg shadow-sm hover:bg-sky-700 transition-colors">
                         Lưu Cài đặt
@@ -192,6 +191,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentUser, users, departments, setC
     };
     
     // Create a pseudo-role for compatibility with the existing nav structure
+    const useId = () => Math.random().toString(36).substr(2, 9);
     const pseudoRole = useId();
     const userDepartments = currentUser.departmentIds.map(id => departments.find(d => d.id === id)).filter((d): d is Department => !!d);
     const isAdmin = userDepartments.some(d => d.name === 'Quản trị');
@@ -211,8 +211,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentUser, users, departments, setC
             { to: "/services", icon: <WrenchScrewdriverIcon />, label: "Quản lý Dịch vụ" },
             { to: "/sales", icon: <ShoppingCartIcon />, label: "Bán hàng" },
             { to: "/inventory", icon: <ArchiveBoxIcon />, label: "Quản lý Kho" },
+            { to: "/assets", icon: <BuildingLibraryIcon />, label: "Quản lý Tài sản" },
             { to: "/customers", icon: <UsersIcon />, label: "Khách hàng" },
-            { to: "/cashflow", icon: <BuildingLibraryIcon />, label: "Quản lý Thu Chi" },
+            { to: "/cashflow", icon: <BuildingLibraryIcon />, label: "Thu – Chi & Tồn quỹ" },
+            { to: "/reports/summary", icon: <ChartPieIcon className="h-6 w-6" />, label: "Báo cáo Tổng hợp" },
             { to: "/reports/revenue", icon: <ChartBarIcon className="h-6 w-6" />, label: "Báo cáo Doanh thu" },
             { to: "/reports/inventory", icon: <DocumentChartBarIcon className="h-6 w-6" />, label: "Báo cáo Tồn kho" },
             { to: "/users", icon: <UserGroupIcon className="h-6 w-6" />, label: "Nhân viên" },

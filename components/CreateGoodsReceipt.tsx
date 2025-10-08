@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Part, Supplier, ReceiptItem, StoreSettings, InventoryTransaction } from '../types';
+import type { Part, Supplier, ReceiptItem, StoreSettings, InventoryTransaction, PaymentSource, CashTransaction } from '../types';
 import { PlusIcon, ArchiveBoxIcon, TrashIcon, XMarkIcon, CameraIcon, ExclamationTriangleIcon, ArrowUturnLeftIcon, MinusIcon, ShoppingCartIcon } from './common/Icons';
 
 const formatCurrency = (amount: number) => {
@@ -385,9 +385,20 @@ interface CreateGoodsReceiptProps {
     setSuppliers: React.Dispatch<React.SetStateAction<Supplier[]>>;
     storeSettings: StoreSettings;
     currentBranchId: string;
+    paymentSources: PaymentSource[];
+    setPaymentSources: React.Dispatch<React.SetStateAction<PaymentSource[]>>;
+    cashTransactions: CashTransaction[];
+    setCashTransactions: React.Dispatch<React.SetStateAction<CashTransaction[]>>;
 }
 
-const CreateGoodsReceipt: React.FC<CreateGoodsReceiptProps> = ({ parts, setParts, transactions, setTransactions, suppliers, setSuppliers, storeSettings, currentBranchId }) => {
+const CreateGoodsReceipt: React.FC<CreateGoodsReceiptProps> = ({ 
+    parts, setParts, 
+    transactions, setTransactions, 
+    suppliers, setSuppliers, 
+    storeSettings, currentBranchId,
+    paymentSources, setPaymentSources,
+    cashTransactions, setCashTransactions
+}) => {
     const [receiptCart, setReceiptCart] = useState<ReceiptItem[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isPartModalOpen, setIsPartModalOpen] = useState(false);
@@ -395,9 +406,10 @@ const CreateGoodsReceipt: React.FC<CreateGoodsReceiptProps> = ({ parts, setParts
     const [supplierSearch, setSupplierSearch] = useState('');
     const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
     const [receiptDiscount, setReceiptDiscount] = useState(0);
-    const [paymentStatus, setPaymentStatus] = useState<'full' | 'partial'>('full');
-    const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer'>('cash');
+    const [paymentStatus, setPaymentStatus] = useState<'full' | 'partial' | null>(null);
+    const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | null>(null);
     const [useCurrentTime, setUseCurrentTime] = useState(true);
+    const [customReceiptTime, setCustomReceiptTime] = useState(new Date().toISOString().slice(0, 16));
     const [warnings, setWarnings] = useState<Record<string, string>>({});
     const [isSupplierListOpen, setIsSupplierListOpen] = useState(false);
     const [mobileView, setMobileView] = useState<'products' | 'cart'>('products');
@@ -507,10 +519,17 @@ const CreateGoodsReceipt: React.FC<CreateGoodsReceiptProps> = ({ parts, setParts
 
 
     const handleFinalizeReceipt = () => {
+        if (receiptCart.length === 0 || !paymentStatus || !paymentMethod) {
+            alert('Vui lòng thêm sản phẩm vào giỏ và chọn hình thức thanh toán.');
+            return;
+        }
+
         const receiptId = `PN${Date.now()}`;
+        const receiptDate = useCurrentTime ? new Date() : new Date(customReceiptTime);
+
         const newTransactions: InventoryTransaction[] = receiptCart.map(item => ({
             id: `TXN-${receiptId}-${item.partId}`, type: 'Nhập kho', partId: item.partId, partName: item.partName,
-            quantity: item.quantity, date: new Date().toISOString().split('T')[0], notes: `Phiếu nhập ${receiptId}`,
+            quantity: item.quantity, date: receiptDate.toISOString().split('T')[0], notes: `Phiếu nhập ${receiptId}`,
             unitPrice: item.purchasePrice, totalPrice: item.purchasePrice * item.quantity, branchId: currentBranchId,
         }));
         
@@ -525,6 +544,36 @@ const CreateGoodsReceipt: React.FC<CreateGoodsReceiptProps> = ({ parts, setParts
             }
             return p;
         }));
+
+        // Financial Transaction Logic
+        if (paymentStatus === 'full') { // For now, only handle full payment. Partial payment would need an amount input.
+            const selectedSupplier = suppliers.find(s => s.id === selectedSupplierId);
+
+            const newCashTransaction: CashTransaction = {
+                id: `CT-${receiptId}`,
+                type: 'expense',
+                date: receiptDate.toISOString(),
+                amount: cartTotal,
+                contact: {
+                    id: selectedSupplierId || 'UNKNOWN_SUPPLIER',
+                    name: selectedSupplier?.name || supplierSearch || 'NCC không xác định',
+                },
+                notes: `Thanh toán cho phiếu nhập kho #${receiptId}`,
+                paymentSourceId: paymentMethod!,
+                branchId: currentBranchId,
+            };
+
+            setCashTransactions(prev => [newCashTransaction, ...prev]);
+
+            setPaymentSources(prevSources => prevSources.map(ps => {
+                if (ps.id === paymentMethod) {
+                    const newBalance = { ...ps.balance };
+                    newBalance[currentBranchId] = (newBalance[currentBranchId] || 0) - cartTotal;
+                    return { ...ps, balance: newBalance };
+                }
+                return ps;
+            }));
+        }
         
         alert('Nhập kho thành công!');
         navigate('/inventory');
@@ -696,13 +745,20 @@ const CreateGoodsReceipt: React.FC<CreateGoodsReceiptProps> = ({ parts, setParts
                                 <label><input type="radio" name="receiptTime" checked={useCurrentTime} onChange={() => setUseCurrentTime(true)} className="mr-1"/> Thời gian hiện tại</label>
                                 <label><input type="radio" name="receiptTime" checked={!useCurrentTime} onChange={() => setUseCurrentTime(false)} className="mr-1"/> Tùy chỉnh</label>
                             </div>
+                            {!useCurrentTime && <input type="datetime-local" value={customReceiptTime} onChange={e => setCustomReceiptTime(e.target.value)} className="mt-2 p-2 border dark:border-slate-600 rounded-md w-full sm:w-auto dark:bg-slate-700 dark:text-white"/>}
                         </div>
                     </div>
 
                     <div className="mt-auto pt-4 border-t dark:border-slate-700 flex-shrink-0">
                         <div className="flex justify-end gap-3">
                             <button className="bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold py-3 px-6 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500">LƯU NHÁP</button>
-                            <button onClick={handleFinalizeReceipt} className="bg-orange-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-orange-600">NHẬP KHO</button>
+                            <button 
+                                onClick={handleFinalizeReceipt} 
+                                disabled={receiptCart.length === 0 || !paymentStatus || !paymentMethod}
+                                className="bg-orange-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-orange-600 disabled:bg-orange-300 disabled:cursor-not-allowed"
+                            >
+                                NHẬP KHO
+                            </button>
                         </div>
                     </div>
                     </>

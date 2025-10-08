@@ -1,9 +1,12 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { WrenchScrewdriverIcon, ArchiveBoxIcon, UsersIcon, BanknotesIcon, ChartBarIcon, ClockIcon, BellAlertIcon } from './common/Icons';
-import type { WorkOrder, Customer, Part } from '../types';
+// FIX: Remove unused icon imports that were causing errors.
+import { WrenchScrewdriverIcon, ArchiveBoxIcon, UsersIcon, BanknotesIcon, ChartBarIcon, ClockIcon, DocumentTextIcon } from './common/Icons';
+import type { WorkOrder, InventoryTransaction, Part, PaymentSource } from '../types';
 
 interface StatCardProps {
+    // Fix: Changed icon prop type to React.ReactElement to ensure it's a clonable element, fixing the type error with React.cloneElement.
+    // Fix: Use React.ReactElement<any> to allow passing props like className without causing a TypeScript error.
     icon: React.ReactElement<any>;
     title: string;
     value: string;
@@ -15,6 +18,7 @@ const StatCard: React.FC<StatCardProps> = ({ icon, title, value, color, linkTo }
     const content = (
          <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm flex items-center h-full border border-slate-200/60 dark:border-slate-700">
             <div className={`p-4 rounded-full ${color}`}>
+                {/* FIX: Remove type assertion as the prop type is now correct. */}
                 {React.cloneElement(icon, { className: 'w-7 h-7 text-white' })}
             </div>
             <div className="ml-4">
@@ -37,12 +41,14 @@ const StatCard: React.FC<StatCardProps> = ({ icon, title, value, color, linkTo }
 
 interface DashboardProps {
     workOrders: WorkOrder[];
-    customers: Customer[];
+    transactions: InventoryTransaction[];
     parts: Part[];
     currentBranchId: string;
+    paymentSources: PaymentSource[];
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ workOrders, customers, parts, currentBranchId }) => {
+const Dashboard: React.FC<DashboardProps> = ({ workOrders, transactions, parts, currentBranchId, paymentSources }) => {
+  // Mock data for demonstration
   const stats = {
     dailyRevenue: 8500000,
     servicesToday: 12,
@@ -50,9 +56,18 @@ const Dashboard: React.FC<DashboardProps> = ({ workOrders, customers, parts, cur
   };
 
   const salesData = useMemo(() => {
-        const branchWorkOrders = workOrders.filter(wo => wo.branchId === currentBranchId && wo.status === 'Trả máy');
-        return branchWorkOrders.reduce((sum, wo) => sum + wo.total, 0);
-    }, [workOrders, currentBranchId]);
+        const workOrderSales = workOrders
+            .filter(wo => wo.status === 'Trả máy' && wo.branchId === currentBranchId)
+            .map(wo => ({ total: wo.total }));
+
+        const retailSales = transactions
+            .filter(tx => tx.type === 'Xuất kho' && tx.branchId === currentBranchId)
+            .map(tx => ({ total: tx.totalPrice || 0 }));
+            
+        return [...workOrderSales, ...retailSales];
+    }, [workOrders, transactions, currentBranchId]);
+
+    const totalRevenue = salesData.reduce((sum, sale) => sum + sale.total, 0);
 
     const lowStockCount = useMemo(() => {
         return parts.filter(p => (p.stock[currentBranchId] || 0) > 0 && (p.stock[currentBranchId] || 0) < 5).length;
@@ -62,44 +77,8 @@ const Dashboard: React.FC<DashboardProps> = ({ workOrders, customers, parts, cur
     { id: 1, icon: <WrenchScrewdriverIcon className="w-5 h-5 text-sky-500"/>, text: "Hoàn thành sửa xe cho khách hàng Nguyễn Văn A.", time: "10 phút trước" },
     { id: 2, icon: <ArchiveBoxIcon className="w-5 h-5 text-green-500"/>, text: "Nhập thêm 20 bugi NGK.", time: "1 giờ trước" },
     { id: 3, icon: <UsersIcon className="w-5 h-5 text-violet-500"/>, text: "Khách hàng Trần Thị B đặt lịch thay nhớt.", time: "3 giờ trước" },
+    { id: 4, icon: <DocumentTextIcon className="w-5 h-5 text-slate-500"/>, text: "Thanh toán đơn hàng #1024.", time: "5 giờ trước" },
   ];
-
-  const oilChangeReminders = useMemo(() => {
-    const OIL_CHANGE_INTERVAL = 1500; // km
-    const latestOdometerMap = new Map<string, number>();
-
-    // Find the latest odometer reading for each customer (by phone number)
-    workOrders.forEach(wo => {
-        if (wo.customerPhone && wo.odometerReading) {
-            const currentMax = latestOdometerMap.get(wo.customerPhone) || 0;
-            if (wo.odometerReading > currentMax) {
-                latestOdometerMap.set(wo.customerPhone, wo.odometerReading);
-            }
-        }
-    });
-
-    return customers
-        .map(customer => {
-            if (!customer.lastServiceOdometer || !customer.phone) return null;
-
-            const latestOdometer = latestOdometerMap.get(customer.phone);
-            if (!latestOdometer || latestOdometer <= customer.lastServiceOdometer) return null;
-
-            const kmSinceChange = latestOdometer - customer.lastServiceOdometer;
-            if (kmSinceChange >= OIL_CHANGE_INTERVAL) {
-                return {
-                    ...customer,
-                    latestOdometer,
-                    kmSinceChange,
-                    kmOverdue: kmSinceChange - OIL_CHANGE_INTERVAL,
-                };
-            }
-            return null;
-        })
-        .filter((c): c is NonNullable<typeof c> => c !== null)
-        .sort((a,b) => b.kmOverdue - a.kmOverdue);
-
-  }, [customers, workOrders]);
   
   return (
     <div className="space-y-8">
@@ -127,46 +106,15 @@ const Dashboard: React.FC<DashboardProps> = ({ workOrders, customers, parts, cur
         />
         <StatCard 
             icon={<ChartBarIcon />}
-            title="Tổng doanh thu DV (Chi nhánh)"
-            value={`${salesData.toLocaleString('vi-VN')} ₫`}
+            title="Tổng doanh thu (Chi nhánh)"
+            value={`${totalRevenue.toLocaleString('vi-VN')} ₫`}
             color="bg-violet-500"
             linkTo="/reports/revenue"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200/60 dark:border-slate-700">
-            <h2 className="text-lg sm:text-xl font-semibold text-slate-700 dark:text-slate-100 mb-4 flex items-center">
-                <BellAlertIcon className="w-6 h-6 mr-3 text-orange-500"/>
-                Khách hàng cần nhắc nhở
-            </h2>
-            {oilChangeReminders.length > 0 ? (
-                <ul className="space-y-3 max-h-96 overflow-y-auto">
-                    {oilChangeReminders.map(customer => (
-                        <li key={customer.id} className="p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-500/30">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="font-bold text-slate-800 dark:text-slate-100">{customer.name}</p>
-                                    <a href={`tel:${customer.phone}`} className="text-sm text-sky-600 dark:text-sky-400 hover:underline">{customer.phone}</a>
-                                </div>
-                                <span className="text-sm font-bold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-500/20 px-2.5 py-1 rounded-full">
-                                    Quá {customer.kmOverdue.toLocaleString('vi-VN')} km
-                                </span>
-                            </div>
-                            <div className="mt-2 pt-2 border-t border-orange-200 dark:border-orange-500/30 text-xs text-slate-600 dark:text-slate-400 space-y-1">
-                                <p>Lần thay nhớt cuối: <strong>{customer.lastServiceDate}</strong> lúc <strong>{customer.lastServiceOdometer?.toLocaleString('vi-VN')} km</strong></p>
-                                <p>Lần ghé gần nhất: <strong>{customer.latestOdometer.toLocaleString('vi-VN')} km</strong> (đã đi {customer.kmSinceChange.toLocaleString('vi-VN')} km)</p>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
-            ) : (
-                 <div className="text-center py-8 text-slate-500 dark:text-slate-400">
-                    <p>Hiện không có khách hàng nào đến hạn thay nhớt.</p>
-                </div>
-            )}
-        </div>
-         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200/60 dark:border-slate-700">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200/60 dark:border-slate-700">
             <h2 className="text-lg sm:text-xl font-semibold text-slate-700 dark:text-slate-100 mb-4">Hoạt động gần đây</h2>
             <ul className="space-y-4">
                 {recentActivities.map(activity => (
@@ -182,6 +130,36 @@ const Dashboard: React.FC<DashboardProps> = ({ workOrders, customers, parts, cur
                     </li>
                 ))}
             </ul>
+        </div>
+        <div className="space-y-8">
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200/60 dark:border-slate-700">
+                <h2 className="text-lg sm:text-xl font-semibold text-slate-700 dark:text-slate-100 mb-4">Tình hình tài chính</h2>
+                <ul className="space-y-3">
+                    {paymentSources.map(source => (
+                        <li key={source.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50">
+                            <span className="font-medium text-slate-700 dark:text-slate-300">{source.name}</span>
+                            <span className="font-bold text-lg text-green-600 dark:text-green-400">{(source.balance[currentBranchId] || 0).toLocaleString('vi-VN')} ₫</span>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200/60 dark:border-slate-700">
+                <h2 className="text-lg sm:text-xl font-semibold text-slate-700 dark:text-slate-100 mb-4">Công việc cần chú ý</h2>
+                <ul className="space-y-3">
+                    <li className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                        <span className="text-slate-700 dark:text-slate-300">Kiểm tra định kỳ xe SH của anh Long</span>
+                        <span className="text-sm font-medium text-red-500 bg-red-100 dark:bg-red-500/20 dark:text-red-300 px-2.5 py-1 rounded-full">Sắp tới hạn</span>
+                    </li>
+                    <li className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                        <span className="text-slate-700 dark:text-slate-300">Gọi điện xác nhận lịch hẹn với chị Mai</span>
+                        <span className="text-sm font-medium text-sky-600 bg-sky-100 dark:bg-sky-500/20 dark:text-sky-300 px-2.5 py-1 rounded-full">Hôm nay</span>
+                    </li>
+                     <li className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                        <span className="text-slate-700 dark:text-slate-300">Đặt hàng dầu nhớt Motul</span>
+                        <span className="text-sm font-medium text-amber-600 bg-amber-100 dark:bg-amber-500/20 dark:text-amber-300 px-2.5 py-1 rounded-full">Cần thực hiện</span>
+                    </li>
+                </ul>
+            </div>
         </div>
       </div>
     </div>

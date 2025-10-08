@@ -13,7 +13,8 @@ const getTitleFromPath = (pathname: string): string => {
     if (pathname.includes('/sales')) return 'Bán hàng';
     if (pathname.includes('/inventory')) return 'Quản lý Kho';
     if (pathname.includes('/customers')) return 'Khách hàng';
-    if (pathname.includes('/cashflow')) return 'Quản lý Thu Chi';
+    if (pathname.includes('/cashflow')) return 'Thu – Chi & Tồn quỹ';
+    if (pathname.includes('/reports/summary')) return 'Báo cáo Tổng hợp';
     if (pathname.includes('/reports/revenue')) return 'Báo cáo Doanh thu';
     if (pathname.includes('/reports/inventory')) return 'Báo cáo Tồn kho';
     if (pathname.includes('/users')) return 'Nhân viên';

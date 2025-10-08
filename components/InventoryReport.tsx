@@ -117,8 +117,11 @@ const InventoryReport: React.FC<InventoryReportProps> = ({ parts, transactions, 
                     aValue = a.stock[branchId] || 0;
                     bValue = b.stock[branchId] || 0;
                 } else {
-                    aValue = a[sortConfig.key as keyof ReportPart];
-                    bValue = b[sortConfig.key as keyof ReportPart];
+                    // FIX: Use `any` cast to access dynamic properties on union type.
+                    // This is safe because `sortConfig.key` is only set for properties
+                    // that exist on the items in the current active tab's data.
+                    aValue = (a as any)[sortConfig.key];
+                    bValue = (b as any)[sortConfig.key];
                 }
 
                 if (aValue === undefined || aValue === null) return 1;
@@ -230,11 +233,12 @@ const InventoryReport: React.FC<InventoryReportProps> = ({ parts, transactions, 
                                             <span className="font-medium">Hết hạn vào: {part.expiryDate}</span>
                                         </div>
                                     )}
-                                    {activeTab === 'slow-moving' && part.daysSinceLastSale !== undefined && (
+                                    {/* FIX: Cast `part` to `ReportPart` to safely access `daysSinceLastSale`. This is safe because this block only renders for the 'slow-moving' tab. */}
+                                    {activeTab === 'slow-moving' && (part as ReportPart).daysSinceLastSale !== undefined && (
                                          <div className="flex items-center text-sm">
                                              <ClockIcon className="w-4 h-4 mr-2 text-sky-600 dark:text-sky-400"/>
                                              <span className="text-slate-600 dark:text-slate-300">Chưa bán trong: </span>
-                                             <span className="font-bold text-sky-600 dark:text-sky-400 ml-1">{part.daysSinceLastSale} ngày</span>
+                                             <span className="font-bold text-sky-600 dark:text-sky-400 ml-1">{(part as ReportPart).daysSinceLastSale} ngày</span>
                                         </div>
                                     )}
                                 </div>
@@ -278,8 +282,10 @@ const InventoryReport: React.FC<InventoryReportProps> = ({ parts, transactions, 
                                                 case 'name': return <td key={header.key} className="p-4 text-slate-900 dark:text-slate-100 font-semibold">{part.name}</td>;
                                                 case 'sku': return <td key={header.key} className="p-4 text-slate-600 dark:text-slate-300">{part.sku}</td>;
                                                 case 'expiryDate': return <td key={header.key} className="p-4 text-red-600 dark:text-red-400 font-medium">{part.expiryDate}</td>;
-                                                case 'lastSoldDate': return <td key={header.key} className="p-4 text-slate-700 dark:text-slate-200">{part.lastSoldDate || 'Chưa bán'}</td>;
-                                                case 'daysSinceLastSale': return <td key={header.key} className="p-4 text-sky-600 dark:text-sky-400 font-medium">{part.daysSinceLastSale}</td>;
+                                                // FIX: Cast `part` to `ReportPart` to access properties that only exist on that type.
+                                                // This is safe because these headers are only rendered for the 'slow-moving' tab.
+                                                case 'lastSoldDate': return <td key={header.key} className="p-4 text-slate-700 dark:text-slate-200">{(part as ReportPart).lastSoldDate || 'Chưa bán'}</td>;
+                                                case 'daysSinceLastSale': return <td key={header.key} className="p-4 text-sky-600 dark:text-sky-400 font-medium">{(part as ReportPart).daysSinceLastSale}</td>;
                                                 default: return <td key={header.key}></td>;
                                             }
                                         })}

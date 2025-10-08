@@ -1,5 +1,5 @@
 {
-  "name": "motocare-pro---quản-lý-cửa-hàng-xe-máy",
+  "name": "copy-of-motocare-pro---quản-lý-cửa-hàng-xe-máy",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,10 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^1.21.0",
-    "@google/generative-ai": "^0.24.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "@google/genai": "^1.21.0",
     "react-router-dom": "^7.9.3"
   },
   "devDependencies": {

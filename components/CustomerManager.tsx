@@ -10,20 +10,16 @@ const CustomerModal: React.FC<{
     customer: Customer | null;
 }> = ({ isOpen, onClose, onSave, customer }) => {
     const [formData, setFormData] = useState<Omit<Customer, 'id'>>(() => 
-        customer ? { ...customer } : { name: '', phone: '', vehicle: '', licensePlate: '', loyaltyPoints: 0, lastServiceOdometer: undefined }
+        customer ? { ...customer } : { name: '', phone: '', vehicle: '', licensePlate: '', loyaltyPoints: 0 }
     );
     
     React.useEffect(() => {
-        setFormData(customer ? { ...customer } : { name: '', phone: '', vehicle: '', licensePlate: '', loyaltyPoints: 0, lastServiceOdometer: undefined });
+        setFormData(customer ? { ...customer } : { name: '', phone: '', vehicle: '', licensePlate: '', loyaltyPoints: 0 });
     }, [customer]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value, type } = e.target;
-        if (name === 'lastServiceOdometer') {
-            setFormData(prev => ({ ...prev, lastServiceOdometer: value === '' ? undefined : parseInt(value, 10) }));
-        } else {
-            setFormData(prev => ({ ...prev, [name]: type === 'number' ? parseInt(value) || 0 : value }));
-        }
+        setFormData(prev => ({ ...prev, [name]: type === 'number' ? parseInt(value) || 0 : value }));
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -31,9 +27,6 @@ const CustomerModal: React.FC<{
         const finalCustomer: Customer = {
             id: customer?.id || `C${String(Math.floor(Math.random() * 900) + 100)}`,
             ...formData,
-            lastServiceDate: formData.lastServiceOdometer && !formData.lastServiceDate 
-                ? new Date().toISOString().split('T')[0] 
-                : formData.lastServiceDate,
         };
         onSave(finalCustomer);
     };
@@ -64,10 +57,6 @@ const CustomerModal: React.FC<{
                                     <label htmlFor="customer-licensePlate" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Biển số xe</label>
                                     <input id="customer-licensePlate" type="text" name="licensePlate" value={formData.licensePlate} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
                                 </div>
-                            </div>
-                            <div>
-                                <label htmlFor="customer-odometer" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Số ODO (km)</label>
-                                <input id="customer-odometer" type="number" name="lastServiceOdometer" value={formData.lastServiceOdometer || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 text-slate-900 dark:text-slate-100" />
                             </div>
                             <div>
                                 <label htmlFor="customer-loyaltyPoints" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Điểm tích lũy</label>
